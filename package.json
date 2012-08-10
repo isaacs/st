@@ -1,0 +1,29 @@
+{
+  "name": "st",
+  "version": "0.0.0",
+  "description": "A module for serving static files.  Does etags, caching, etc.",
+  "main": "st.js",
+  "dependencies": {
+    "lru-cache": "~2.0.0",
+    "mime": "~1.2.7",
+    "negotiator":"~0.2.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "tap test/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/isaacs/st"
+  },
+  "keywords": [
+    "static",
+    "file",
+    "serve",
+    "etag",
+    "autoindex",
+    "cache"
+  ],
+  "author": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
+  "license": "BSD"
+}
