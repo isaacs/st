@@ -1,5 +1,7 @@
 module.exports = st
 
+st.Mount = Mount
+
 var mime = require('mime')
 var path = require('path')
 var LRU = require('lru-cache')
@@ -8,6 +10,45 @@ var url = require('url')
 var zlib = require('zlib')
 var Neg = require('negotiator')
 var http = require('http')
+var AC = require('async-cache')
+var util = require('util')
+
+// default caching options
+var defaultCacheOptions = {
+  fd: {
+    max: 1000,
+    maxAge: 1000 * 60 * 60,
+    dispose: function (key, fd) {
+      fs.close(fd, function () {})
+    }
+  },
+  stat: {
+    max: 5000,
+    maxAge: 1000 * 60
+  },
+  content: {
+    max: 1024 * 1024 * 1024,
+    length: function (n) {
+      return n.length
+    },
+    maxAge: 1000 * 60 * 10
+  },
+  index: {
+    max: 1000,
+    length: function (n) {
+      return n.length
+    },
+    maxAge: 1000 * 60 * 10
+  },
+  readdir: {
+    max: 1000,
+    length: function (n) {
+      return n.length
+    },
+    maxAge: 1000 * 60 * 10
+  }
+}
+
 
 function st (opt) {
   var p, u
@@ -19,7 +60,10 @@ function st (opt) {
       opt = arguments[2]
     }
   }
+
   if (!opt) opt = {}
+  else opt = util._extend({}, opt)
+
   if (!p) p = opt.path
   if (typeof p !== 'string') throw new Error('no path specified')
   p = path.resolve(p)
@@ -27,302 +71,225 @@ function st (opt) {
   if (!u) u = p.substr(path.cwd().length).replace(/\\/g, '/')
   if (u.charAt(0) !== '/') u = '/' + u
 
-  // default to 10 minutes
-  var cacheExpiry = opt.cacheExpiry
-  if (isNaN(cacheExpiry)) cacheExpiry = 1000 * 60 * 10
+  opt.url = u
+  opt.path = p
 
-  // fd cache
-  var fdCacheSize = +opt.fdCacheSize
-  if (isNaN(fdCacheSize) || fdCacheSize < 0) {
-    fdCacheSize = 1024
+  var m = new Mount(opt)
+  return m.serve.bind(m)
+}
+
+function Mount (opt) {
+  if (!opt) throw new Error('no options provided')
+  if (typeof opt !== 'object') throw new Error('invalid options')
+  if (!(this instanceof Mount)) return new Mount(opt)
+
+  this.opt = opt
+  this.url = opt.url
+  this.path = opt.path
+  this._index = opt.index === false ? false
+              : typeof opt.index === 'string' ? opt.index
+              : true
+
+  // cache basically everything
+  var c = this.getCacheOptions(opt)
+  this.cache = {
+    fd: AC(c.fd),
+    stat: AC(c.stat),
+    index: AC(c.index),
+    readdir: AC(c.readdir),
+    content: AC(c.content)
+  };
+}
+
+Mount.prototype.getCacheOptions = function (opt) {
+  var o = opt.cache || {}
+  var d = defaultCacheOptions
+  var c = {
+    fd: util._extend(util._extend({}, d.fd), o.fd),
+    stat: util._extend(util._extend({}, d.stat), o.stat),
+    index: util._extend(util._extend({}, d.index), o.index),
+    readdir: util._extend(util._extend({}, d.readdir), o.readdir),
+    content: util._extend(util._extend({}, d.content), o.content)
   }
-  var fdCache, statCache
-  if (fdCacheSize > 0) {
-    fdCache = LRU({
-      max: fdCacheSize,
-      dispose: function (key, fd) {
-        fs.close(fd, function () {})
-      }
-    })
-    statCache = new LRU({
-      max: fdCacheSize,
-      maxAge: cacheExpiry
-    })
-  } else {
-    // fake cache
-    fdCache = statCache = {
-      opening: {},
-      set: function () {},
-      get: function () {}
-    }
-  }
+  c.fd.load = this._loadFd.bind(this)
+  c.stat.load = this._loadStat.bind(this)
+  c.index.load = this._loadIndex.bind(this)
+  c.readdir.load = this._loadReaddir.bind(this)
+  c.content.load = this._loadContent.bind(this)
+  return c
+}
 
-  // content cache
-  var cacheSize = opt.cacheSize
-  if (isNaN(cacheSize)) cacheSize = 0
-  var contentCache
-  if (cacheSize) {
-    contentCache = LRU({
-      max: cacheSize,
-      maxAge: cacheExpiry,
-      length: function (item) {
-        return item.size
-      }
-    })
-  }
 
-  var etags = {}
+// get a path from a url
+Mount.prototype.getPath = function (u) {
+  u = path.join('/', url.parse(u).pathname).replace(/\\/g, '/')
+  if (u.indexOf(this.url) !== 0) return false;
 
-  return mount
-  function mount (req, res, next) {
-    var ru = url.parse(req.url).pathname.replace(/\/\/+/g, '/')
-    var pos = ru.indexOf(u)
-    // not something we care about
-    if (pos !== 0) {
-      if (next) next()
-      return false
-    }
+  // /a/b/c mounted on /path/to/z/d/x
+  // /a/b/c/d --> /path/to/z/d/x/d
+  u = u.substr(this.url.length)
+  if (u.charAt(0) !== '/') u = '/' + u
+  var p = path.join(this.path, u)
+  return p
+}
 
-    // don't allow dot-urls by default, unless explicitly allowed.
-    if (!opt.dot && ru.match(/(^|\/)\./)) {
-      res.statusCode = 403
-      res.end('Forbidden')
-      return true
-    }
+// get a url from a path
+Mount.prototype.getUrl = function (p) {
+  p = path.resolve(p)
+  if (p.indexOf(this.path) !== 0) return false;
+  p = path.join('/', p.substr(this.path.length))
+  var u = path.join(this.url, p).replace(/\\/g, '/')
+  return u
+}
 
-    // At this point, we're taking the request, because it's into the mount.
-    // make sure to return true!
+Mount.prototype.serve = function (req, res) {
+  if (req.method !== 'HEAD' && req.method !== 'GET') return false
+  var p = this.getPath(req.url)
+  if (!p) return false;
 
-    var pru = path.join(p, path.join('/', ru))
-    pru = pru.replace(/\/+$/, '')
-    var etag = etags[pru]
-    if (etag && etag === req.headers['if-none-match']) {
-      res.statusCode = 304
-      res.end()
-      return true
-    }
-
-    // TODO: byte range requests.
-    // does that play nice with gzip?  the spec is kinda dense.
-
-    var gz = false
-    if (opt.gz !== false) {
-      var neg = req.negotiator || new Neg(req)
-      gz = neg.preferredEncoding('gzip', 'identity') === 'gzip'
-    }
-
-    // see if the content is in cache.
-    if (contentCache) {
-      var cached = contentCache.get(pru)
-      if (cached) {
-        res.statusCode = 200
-        res.setHeader('etag', cached.etag)
-        res.setHeader('mime-type', mime.lookup(path.extname(pru)))
-        if (gz) {
-          res.setHeader('content-encoding', 'gzip')
-          res.setHeader('content-length', cached.gz.length)
-          res.end(cached.gz)
-        } else {
-          res.setHeader('content-length', cached.length)
-          res.end(cached)
-        }
-        return true
-      }
-    }
-
-    // not served out of cache.
-    // we have to read the actual file, i guess.
-    open(pru, fdCache, function (er, fd) {
-      if (er) return error(res, er)
-
-      // the fd is opened now, and in the cache
-      // need to get the fstat
-      fstat(fd, pru, statCache, function (er, stat) {
-        if (er) return error(res, er)
-        if (stat.isDirectory()) {
-          if (opt.autoindex !== false) {
-            // url should always end in /
-            if (!ru.match(/\/$/)) {
-              res.statusCode = 301
-              res.setHeader('location', ru + '/')
-              res.end('Moved: ' + ru + '/')
-              return
-            }
-            return autoindex(ru, pru, opt, res)
-          } else {
-            res.statusCode = 404
-            res.end('not found: ' + u)
-            return
-          }
-        }
-
-        // don't bother even attempting to cache if it's too big
-        var doCache = contentCache && stat.size < cacheSize
-        var cache = fdCache ? contentCache : null
-        serve(res, fd, pru, cache, gz, stat, etags, fdCache)
-      })
-    })
+  // don't allow dot-urls by default, unless explicitly allowed.
+  if (!this.opt.dot && p.match(/(^|\/)\./)) {
+    res.statusCode = 403
+    res.end('Forbidden')
     return true
   }
+
+  // now we have a path.  check for the fd.
+  this.cache.fd.get(p, function (er, fd) {
+    // inability to open is some kind of error, probably 404
+    if (er) return this.error(er, res)
+    this.cache.stat.get(fd+':'+p, function (er, stat) {
+      if (er) return this.error(er, res);
+
+      var ims = req.headers['if-modified-since']
+      if (ims) ims = new Date(ims).getTime();
+      if (ims && ims >= stat.mtime.getTime()) {
+        res.statusCode = 304
+        res.end()
+        return
+      }
+
+      var etag = getEtag(stat)
+      if (req.headers['if-none-match'] === etag) {
+        res.statusCode = 304
+        res.end()
+        return
+      }
+      res.setHeader('cache-control', 'public')
+      res.setHeader('last-modified', stat.mtime.toUTCString())
+      res.setHeader('etag', etag)
+      if (stat.isDirectory()) {
+        return this.index(p, req, res)
+      }
+      return this.file(p, fd, stat, etag, req, res)
+    }.bind(this));
+  }.bind(this));
+
+  return true;
 }
 
-function serve (res, fd, pru, cache, gz, stat, etags, fdCache) {
-  // kind of wasteful.
-  // should probably do the fs stuff manually
-  // but if you aren't caching contents, then it's probably because the
-  // files are big, and if you are caching contents, then it doesn't
-  // matter most of the time anyway.
-  var stream = fs.createReadStream(pru, { start: 0, fd: fd })
-  // we're actually going to re-use the fd repeatedly, so no-op this.
-  stream.destroy = function () {}
-
-  function serveError(er) {
-    console.error('Error', pru, er.stack || er.message)
-    res.destroy()
-    if (cache) cache.del(pru)
-    fdCache.del(pru)
-  }
-
-  stream.on('error', serveError)
-
-  // don't gzip files ending in .gz or .tgz
-  if (!pru.match(/.\.t?gz$/)) {
-    var gzstr = zlib.Gzip()
-    stream.pipe(gzstr)
-    // at this point it's too late to do anything about errors.
-    // just kill the stream.
-    gzstr.on('error', serveError)
-  } else {
-    gz = false
-  }
-
-  res.statusCode = 200
-  var etag = [stat.dev, stat.ino, stat.mtime.getTime()].join(':')
-  etag = '"' + etag + '"'
-  res.setHeader('etag', etag)
-  etags[pru] = etag
-  res.setHeader('mime-type', mime.lookup(path.extname(pru)))
-
-  if (cache) {
-    var ended = 0
-    if (!gzstr) ended++
-
-    var clearBufs = []
-    stream.on('data', clearBufs.push.bind(clearBufs))
-    stream.on('end', function () {
-      clearBufs = Buffer.concat(clearBufs)
-      if (++ended === 2) finishCache()
-    })
-
-    if (gzstr) {
-      var gzBufs = []
-      gzstr.on('data', gzBufs.push.bind(gzBufs))
-      gzstr.on('end', function () {
-        gzBufs = Buffer.concat(gzBufs)
-        if (++ended === 2) finishCache()
-      })
-    }
-
-    function finishCache () {
-      // put it in the contentCache
-      if (gzstr) clearBufs.gz = gzBufs
-      clearBufs.etag = etag
-      cache.set(pru, clearBufs)
-    }
-  }
-
-  // not sure whether it's better to gzip or to send a content-length
-  // but at this point, ti would mean reading the whole file before
-  // sending anything, since we don't know how big the gzipped will be.
-  if (!gz) {
-    res.setHeader('content-length', stat.size)
-    stream.pipe(res)
-  } else {
-    res.setHeader('content-encoding', 'gzip')
-    gzstr.pipe(res)
-  }
-}
-
-function fstat (fd, path, statCache, cb_) {
-  var key = fd + ':' + path
-  var cached = statCache.get(key)
-  if (cached) return cb_(null, cached)
-
-  statCache.opening = statCache.opening || {}
-  if (statCache.opening[key]) {
-    statCache.opening[key].push(cb_)
-    return
-  }
-  statCache.opening[key] = [ cb_ ]
-
-  fs.fstat(fd, function (er, stat) {
-    var cbs = statCache.opening[key]
-    delete statCache.opening[key]
-    if (!er) statCache.set(key, stat)
-    cbs.forEach(function (cb) { return cb(er, stat) })
-  })
-}
-
-// mixed sync/async!  it's ok, since this is private, but watch out!
-function open (path, fdCache, cb_) {
-  var cached = fdCache.get(path)
-  if (cached) return cb_(null, cached)
-
-  // don't open the same file multiple times.
-  fdCache.opening = fdCache.opening || {}
-  if (fdCache.opening[path]) {
-    fdCache.opening[path].push(cb_)
-    return
-  }
-  fdCache.opening[path] = [ cb_ ]
-
-  fs.open(path, 'r', function cb (er, fd) {
-    var cbs = fdCache.opening[path]
-    delete fdCache.opening[path]
-    if (!er) fdCache.set(path, fd)
-    cbs.forEach(function (cb) { cb(er, fd) })
-  })
-}
-
-function error (res, er) {
-  res.statusCode = er.code === 'ENOENT' || er.code === 'EISDIR' ? 404
+Mount.prototype.error = function (er, res) {
+  res.statusCode = typeof er === 'number' ? er
+                 : er.code === 'ENOENT' || er.code === 'EISDIR' ? 404
                  : er.code === 'EPERM' || er.code === 'EACCES' ? 403
-                 : 500
-  if (res.error) {
+                 : 500;
+
+  if (typeof res.error === 'function') {
     // pattern of express and ErrorPage
-    return res.error(er, res.statusCode)
+    return res.error(res.statusCode, er)
   }
+
   res.setHeader('content-type', 'text/plain')
   res.end(http.STATUS_CODES[res.statusCode] + '\n' + er.message)
 }
 
-var dirsReading = {}
-function autoindex (url, path, opt, res) {
-  if (dirsReading[path]) {
-    dirsReading[path].push(res)
-    return
+Mount.prototype.index = function (p, req, res) {
+  if (this._index === true) {
+    return this.autoindex(p, req, res)
   }
-  dirsReading[path] = [res]
-  fs.readdir(path, function (er, files) {
-    if (!opt.dot) files = files.filter(function (f) {
-      return !f.match(/^\./)
-    })
-    var ress = dirsReading[path]
-    delete dirsReading[path]
-
-    if (er) return ress.forEach(function (res) { error(res, er) })
-
-    html = index(url, files)
-    ress.forEach(function (res) {
-      res.statusCode = 200
-      res.setHeader('content-type', 'text/html')
-      res.setHeader('content-length', html.length)
-      res.end(html)
-    })
-  })
+  if (typeof this._index === 'string') {
+    if (!/\/$/.test(req.url)) req.url += '/'
+    req.url += this._index
+    return this.serve(req, res)
+  }
+  return this.error(404, res)
 }
 
-function index (url, files) {
+Mount.prototype.autoindex = function (p, req, res) {
+  if (!/\/$/.exec(req.url)) {
+    res.statusCode = 301
+    res.setHeader('location', req.url + '/')
+    res.end('Moved: ' + req.url + '/')
+    return
+  }
+
+  this.cache.index.get(p, function (er, html) {
+    if (er) return this.error(er, res)
+
+    res.statusCode = 200
+    res.setHeader('content-type', 'text/html')
+    res.setHeader('content-length', html.length)
+    res.end(html)
+  }.bind(this));
+}
+
+
+Mount.prototype.file = function (p, fd, stat, etag, req, res) {
+  var key = fd + ':' + stat.size + ':' + etag
+  var mt = mime.lookup(path.extname(p))
+  if (mt !== 'application/octet-stream') {
+    res.setHeader('content-type', mt)
+  }
+  res.setHeader('content-length', stat.size)
+  // only use the content cache if it will actually fit there.
+  if (this.cache.content.has(key)) {
+    this.cachedFile(p, fd, stat, etag, req, res)
+  } else {
+    this.streamFile(p, fd, stat, etag, req, res)
+  }
+}
+
+Mount.prototype.cachedFile = function (p, fd, stat, etag, req, res) {
+  var key = fd + ':' + stat.size + ':' + etag
+  this.cache.content.get(key, function (er, content) {
+    if (er) return this.error(er, res)
+    res.statusCode = 200
+    res.end(content)
+  }.bind(this));
+}
+
+Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
+  var stream = fs.createReadStream(p, { fd: fd, start: 0 })
+  stream.destroy = function () {}
+  res.statusCode = 200
+  stream.pipe(res)
+
+  // too late to effectively handle any errors.
+  // just kill the connection if that happens.
+  stream.on('error', function(e) {
+    console.error('Error serving %s\n%s', p, e.stack || e.message)
+    res.socket.destroy()
+  })
+
+  if (this.cache.content._cache.max > stat.size) {
+    // collect it, and put it in the cache
+    var key = fd + ':' + stat.size + ':' + etag
+    var bufs = []
+    stream.on('data', function (c) {
+      bufs.push(c)
+    })
+    stream.on('end', function () {
+      this.cache.content.set(key, Buffer.concat(bufs))
+    }.bind(this))
+  }
+}
+
+
+// cache-fillers
+
+Mount.prototype._loadIndex = function (p, cb) {
+  // truncate off the first bits
+  var url = p.substr(this.path.length).replace(/\\/g, '/')
   var str =
     '<!doctype html>' +
     '<html>' +
@@ -331,10 +298,94 @@ function index (url, files) {
     '<h1>Index of ' + url + '</h1>' +
     '<hr><pre><a href="../">../</a>\n'
 
-  files.forEach(function (file) {
-    file = file.replace(/"/g, '&quot;')
-    str += '<a href="' + file + '">' + file + '</a>\n'
-  })
-  str += '</pre><hr></body></html>'
-  return new Buffer(str)
+  this.cache.readdir.get(p, function (er, data) {
+    if (er) return cb(er)
+
+    var nameLen = 0
+    var sizeLen = 0
+
+    Object.keys(data).map(function (f) {
+      var d = data[f]
+      var name = f.replace(/"/g, '&quot;')
+      if (d.size === '-') name += '/'
+      var showName = name.replace(/^(.{40}).{3,}$/, '$1..>')
+      nameLen = Math.max(nameLen, showName.length)
+      sizeLen = Math.max(sizeLen, ('' + d.size).length)
+      return [ '<a href="' + name + '">' + showName + '</a>',
+               d.mtime, d.size, showName ];
+    }).sort(function (a, b) {
+      return a[2] === '-' && b[2] !== '-' ? -1 // dirs first
+           : a[2] !== '-' && b[2] === '-' ? 1
+           : a[0].toLowerCase() < b[0].toLowerCase() ? -1 // then alpha
+           : a[0].toLowerCase() > b[0].toLowerCase() ? 1
+           : 0
+    }).forEach(function (line) {
+      var namePad = new Array(8 + nameLen - line[3].length).join(' ')
+      var sizePad = new Array(8 + sizeLen - ('' + line[2]).length).join(' ')
+      str += line[0] + namePad +
+             line[1].toISOString() +
+             sizePad + line[2] + '\n'
+    })
+
+    str += '</pre><hr></body></html>'
+    cb(null, new Buffer(str))
+  });
+}
+
+Mount.prototype._loadReaddir = function (p, cb) {
+  var len
+  var data
+  fs.readdir(p, function (er, files) {
+    if (er) return cb(er)
+    files = files.filter(function (f) {
+      if (!this.opt.dot) return !/^\./.test(f)
+      else return f !== '.' && f !== '..'
+    }.bind(this))
+    len = files.length
+    data = {}
+    files.forEach(function (file) {
+      var pf = path.join(p, file)
+      this.cache.stat.get(pf, function (er, stat) {
+        if (er) return cb(er)
+        if (stat.isDirectory()) stat.size = '-'
+        data[file] = stat
+        next()
+      }.bind(this))
+    }.bind(this))
+  }.bind(this))
+
+  function next () {
+    if (--len === 0) cb(null, data)
+  }
+}
+
+Mount.prototype._loadStat = function (key, cb) {
+  // key is either fd:path or just a path
+  var fdp = key.match(/^(\d+):(.*)/)
+  if (fdp) {
+    var fd = +fdp[1]
+    var p = fdp[2]
+    fs.fstat(fd, function (er, stat) {
+      if (er) return cb(er)
+      this.cache.stat.set(p, stat)
+      cb(null, stat)
+    }.bind(this))
+  } else {
+    fs.stat(key, cb)
+  }
+}
+
+Mount.prototype._loadFd = function (path, cb) {
+  fs.open(path, 'r', cb)
+}
+
+Mount.prototype._loadContent = function (key, cb) {
+  // this function should never be called.
+  // we check if the thing is in the cache, and if not, stream it in
+  // manually.  this.cache.content.get() should not ever happen.
+  throw new Error('This should not ever happen')
+}
+
+function getEtag (s) {
+  return '"' + s.dev + '-' + s.ino + '-' + s.mtime.getTime() + '"'
 }
