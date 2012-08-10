@@ -1,12 +1,12 @@
 {
   "name": "st",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A module for serving static files.  Does etags, caching, etc.",
   "main": "st.js",
   "dependencies": {
     "lru-cache": "~2.0.0",
     "mime": "~1.2.7",
-    "negotiator":"~0.2.3"
+    "negotiator": "~0.2.3"
   },
   "devDependencies": {},
   "scripts": {
