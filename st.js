@@ -27,14 +27,14 @@ var defaultCacheOptions = {
     maxAge: 1000 * 60
   },
   content: {
-    max: 1024 * 1024 * 1024,
+    max: 1024 * 1024 * 64,
     length: function (n) {
       return n.length
     },
     maxAge: 1000 * 60 * 10
   },
   index: {
-    max: 1000,
+    max: 1024 * 8,
     length: function (n) {
       return n.length
     },
@@ -75,7 +75,9 @@ function st (opt) {
   opt.path = p
 
   var m = new Mount(opt)
-  return m.serve.bind(m)
+  var fn = m.serve.bind(m)
+  fn._this = m
+  return fn
 }
 
 function Mount (opt) {
@@ -144,6 +146,10 @@ Mount.prototype.getUrl = function (p) {
 
 Mount.prototype.serve = function (req, res) {
   if (req.method !== 'HEAD' && req.method !== 'GET') return false
+
+  // querystrings are of no concern to us
+  req.url = url.parse(req.url).pathname
+
   var p = this.getPath(req.url)
   if (!p) return false;
 
@@ -200,7 +206,7 @@ Mount.prototype.error = function (er, res) {
   }
 
   res.setHeader('content-type', 'text/plain')
-  res.end(http.STATUS_CODES[res.statusCode] + '\n' + er.message)
+  res.end(http.STATUS_CODES[res.statusCode] + '\n')
 }
 
 Mount.prototype.index = function (p, req, res) {
@@ -240,7 +246,6 @@ Mount.prototype.file = function (p, fd, stat, etag, req, res) {
   if (mt !== 'application/octet-stream') {
     res.setHeader('content-type', mt)
   }
-  res.setHeader('content-length', stat.size)
   // only use the content cache if it will actually fit there.
   if (this.cache.content.has(key)) {
     this.cachedFile(p, fd, stat, etag, req, res)
@@ -251,18 +256,41 @@ Mount.prototype.file = function (p, fd, stat, etag, req, res) {
 
 Mount.prototype.cachedFile = function (p, fd, stat, etag, req, res) {
   var key = fd + ':' + stat.size + ':' + etag
+  var gz = getGz(p, req)
+
   this.cache.content.get(key, function (er, content) {
     if (er) return this.error(er, res)
     res.statusCode = 200
-    res.end(content)
+    if (gz && content.gz) {
+      res.setHeader('content-encoding', 'gzip')
+      res.setHeader('content-length', content.gz.length)
+      res.end(content.gz)
+    } else {
+      res.setHeader('content-length', content.length)
+      res.end(content)
+    }
   }.bind(this));
 }
 
 Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
-  var stream = fs.createReadStream(p, { fd: fd, start: 0 })
+  var streamOpt = { fd: fd, start: 0, end: stat.size }
+  var stream = fs.createReadStream(p, streamOpt)
+  var gzstr = zlib.Gzip()
   stream.destroy = function () {}
+
+  var gz = getGz(p, req)
+
   res.statusCode = 200
-  stream.pipe(res)
+  stream.pipe(gzstr)
+
+  if (gz) {
+    // we don't know how long it'll be, since it will be compressed.
+    res.setHeader('content-encoding', 'gzip')
+    gzstr.pipe(res)
+  } else {
+    res.setHeader('content-length', stat.size)
+    stream.pipe(res)
+  }
 
   // too late to effectively handle any errors.
   // just kill the connection if that happens.
@@ -275,11 +303,17 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
     // collect it, and put it in the cache
     var key = fd + ':' + stat.size + ':' + etag
     var bufs = []
+    var gzbufs = []
     stream.on('data', function (c) {
       bufs.push(c)
     })
-    stream.on('end', function () {
-      this.cache.content.set(key, Buffer.concat(bufs))
+    gzstr.on('data', function (c) {
+      gzbufs.push(c)
+    })
+    gzstr.on('end', function () {
+      var content = Buffer.concat(bufs)
+      content.gz = Buffer.concat(gzbufs)
+      this.cache.content.set(key, content)
     }.bind(this))
   }
 }
@@ -388,4 +422,13 @@ Mount.prototype._loadContent = function (key, cb) {
 
 function getEtag (s) {
   return '"' + s.dev + '-' + s.ino + '-' + s.mtime.getTime() + '"'
+}
+
+function getGz (p,req) {
+  var gz = false
+  if (!/\.t?gz$/.exec(p)) {
+    var neg = req.negotiator || new Neg(req)
+    gz = neg.preferredEncoding('gzip', 'identity') === 'gzip'
+  }
+  return gz
 }
