@@ -68,7 +68,7 @@ function st (opt) {
   if (typeof p !== 'string') throw new Error('no path specified')
   p = path.resolve(p)
   if (!u) u = opt.url
-  if (!u) u = p.substr(path.cwd().length).replace(/\\/g, '/')
+  if (!u) u = p.substr(process.cwd().length).replace(/\\/g, '/')
   if (u.charAt(0) !== '/') u = '/' + u
 
   opt.url = u
