@@ -275,8 +275,11 @@ Mount.prototype.cachedFile = function (p, fd, stat, etag, req, res) {
 Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
   var streamOpt = { fd: fd, start: 0, end: stat.size }
   var stream = fs.createReadStream(p, streamOpt)
-  var gzstr = zlib.Gzip()
   stream.destroy = function () {}
+  if (res.filter) {
+    stream = stream.pipe(res.filter)
+  }
+  var gzstr = zlib.Gzip()
 
   var gz = getGz(p, req)
 
@@ -288,7 +291,7 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
     res.setHeader('content-encoding', 'gzip')
     gzstr.pipe(res)
   } else {
-    res.setHeader('content-length', stat.size)
+    if (!res.filter) res.setHeader('content-length', stat.size)
     stream.pipe(res)
   }
 

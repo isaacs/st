@@ -87,3 +87,12 @@ this utility will use a bit more memory than the cache.content.max and
 cache.index.max bytes would seem to allow.  This will be less than
 double, and usually insignificant for normal web assets, but is
 important to consider if memory is at a premium.
+
+## Filtering Output
+
+If you want to do some fancy stuff to the file before sending it, you
+can attach a `res.filter = myFilterStream` thing to the response
+object before passing it to the mount function.
+
+This is useful if you want to get the benefits of caching and gzipping
+and such, but serve stylus files as css, for example.
