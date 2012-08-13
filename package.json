@@ -6,7 +6,7 @@
   "dependencies": {
     "lru-cache": "~2.0.0",
     "mime": "~1.2.7",
-    "negotiator": "~0.2.3",
+    "negotiator": "~0.2.5",
     "async-cache": "~0.0.2"
   },
   "devDependencies": {},

@@ -431,7 +431,7 @@ function getGz (p,req) {
   var gz = false
   if (!/\.t?gz$/.exec(p)) {
     var neg = req.negotiator || new Neg(req)
-    gz = neg.preferredEncoding('gzip', 'identity') === 'gzip'
+    gz = neg.preferredEncoding(['gzip', 'identity']) === 'gzip'
   }
   return gz
 }
