@@ -7,11 +7,15 @@ var st = require('../st.js')
 var request = require('request')
 var test = require('tap').test
 var port = process.env.PORT || 1337
-var mount = st({
+var util = require('util')
+
+var opts = util._extend({
   autoindex: true,
   path: path.dirname(__dirname),
   url: '/test'
-})
+}, global.options || {})
+
+var mount = st(opts)
 
 function req (url, headers, cb) {
   if (typeof headers === 'function') cb = headers, headers = {}
@@ -63,6 +67,43 @@ test('gzip', function (t) {
       t.end()
     })
   })
+})
+
+test('multiball!', function (t) {
+  var n = 6
+  req('/test/st.js', then)
+  req('/test/README.md', then)
+  req('/test/LICENSE', then)
+  req('/test/package.json', then)
+  req('/test/favicon.ico', then)
+  req('/test/bin/server.js', then)
+
+  function then (er, res, body) {
+    if (er)
+      throw er
+    t.equal(res.statusCode, 200)
+
+    // give them all time to close, then go again.
+    if (--n === 0)
+      setTimeout(function () {
+        n = 6
+        req('/test/st.js', then2)
+        req('/test/README.md', then2)
+        req('/test/LICENSE', then2)
+        req('/test/package.json', then2)
+        req('/test/favicon.ico', then2)
+        req('/test/bin/server.js', then2)
+      }, 200)
+  }
+
+  function then2 (er, res, body) {
+    if (er)
+      throw er
+    t.equal(res.statusCode, 200)
+
+    if (--n === 0)
+      t.end()
+  }
 })
 
 test('teardown', function (t) {
