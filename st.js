@@ -18,9 +18,7 @@ var defaultCacheOptions = {
   fd: {
     max: 1000,
     maxAge: 1000 * 60 * 60,
-    dispose: function (key, fd) {
-      fs.close(fd, function () {})
-    }
+    dispose: shouldClose
   },
   stat: {
     max: 5000,
@@ -47,6 +45,21 @@ var defaultCacheOptions = {
     },
     maxAge: 1000 * 60 * 10
   }
+}
+
+
+var streaming = Object.create(null)
+var pendingClose = Object.create(null)
+
+function shouldClose (path, fd) {
+  // means that this fd is no longer in the fd lru.
+  // however, if any requests are still in process, then
+  // don't close it yet, or that'll cause problems.
+  if (!streaming[path]) {
+    delete pendingClose[path]
+    return fs.close(fd, function () {})
+  }
+  pendingClose[path] = fd
 }
 
 
@@ -106,6 +119,9 @@ function Mount (opt) {
 Mount.prototype.getCacheOptions = function (opt) {
   var o = opt.cache || {}
   var d = defaultCacheOptions
+
+  // should really only ever set max and maxAge here.
+  // load and fd disposal is important to control.
   var c = {
     fd: util._extend(util._extend({}, d.fd), o.fd),
     stat: util._extend(util._extend({}, d.stat), o.stat),
@@ -113,6 +129,8 @@ Mount.prototype.getCacheOptions = function (opt) {
     readdir: util._extend(util._extend({}, d.readdir), o.readdir),
     content: util._extend(util._extend({}, d.content), o.content)
   }
+
+  c.fd.dispose = shouldClose
   c.fd.load = this._loadFd.bind(this)
   c.stat.load = this._loadStat.bind(this)
   c.index.load = this._loadIndex.bind(this)
@@ -295,6 +313,14 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
     stream.pipe(res)
   }
 
+  stream.on('end', function () {
+    delete streaming[p]
+    if (!pendingClose[p])
+      return
+    fs.close(fd, function () {})
+    delete pendingClose[p]
+  })
+
   // too late to effectively handle any errors.
   // just kill the connection if that happens.
   stream.on('error', function(e) {
@@ -413,7 +439,12 @@ Mount.prototype._loadStat = function (key, cb) {
 }
 
 Mount.prototype._loadFd = function (path, cb) {
-  fs.open(path, 'r', cb)
+  // if we were about to close it, just don't.
+  fs.open(path, 'r', function (er, fd) {
+    if (!er)
+      streaming[path] = fd
+    cb(er, fd)
+  })
 }
 
 Mount.prototype._loadContent = function (key, cb) {
