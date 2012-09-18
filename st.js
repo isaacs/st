@@ -162,14 +162,20 @@ Mount.prototype.getUrl = function (p) {
   return u
 }
 
-Mount.prototype.serve = function (req, res) {
-  if (req.method !== 'HEAD' && req.method !== 'GET') return false
+Mount.prototype.serve = function (req, res, next) {
+  if (req.method !== 'HEAD' && req.method !== 'GET') {
+    if (typeof next === 'function') next()
+    return false
+  }
 
   // querystrings are of no concern to us
   req.url = url.parse(req.url).pathname
 
   var p = this.getPath(req.url)
-  if (!p) return false;
+  if (!p) {
+    if (typeof next === 'function') next()
+    return false;
+  }
 
   // don't allow dot-urls by default, unless explicitly allowed.
   if (!this.opt.dot && p.match(/(^|\/)\./)) {
