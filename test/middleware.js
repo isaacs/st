@@ -20,5 +20,4 @@ test('call next() if asset not found', function (t) {
     t.ok(true)
   }
   mount(req, req, next)
-  t.end()
 })
