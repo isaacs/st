@@ -300,6 +300,14 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
   var streamOpt = { fd: fd, start: 0, end: stat.size }
   var stream = fs.createReadStream(p, streamOpt)
   stream.destroy = function () {}
+
+  // too late to effectively handle any errors.
+  // just kill the connection if that happens.
+  stream.on('error', function(e) {
+    console.error('Error serving %s\n%s', p, e.stack || e.message)
+    res.socket.destroy()
+  })
+
   if (res.filter) {
     stream = stream.pipe(res.filter)
   }
@@ -325,13 +333,6 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
       return
     fs.close(fd, function () {})
     delete pendingClose[p]
-  })
-
-  // too late to effectively handle any errors.
-  // just kill the connection if that happens.
-  stream.on('error', function(e) {
-    console.error('Error serving %s\n%s', p, e.stack || e.message)
-    res.socket.destroy()
   })
 
   if (this.cache.content._cache.max > stat.size) {
