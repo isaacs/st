@@ -5,7 +5,12 @@ st.Mount = Mount
 var mime = require('mime')
 var path = require('path')
 var LRU = require('lru-cache')
-var fs = require('fs')
+var fs
+try {
+  fs = require('graceful-fs')
+} catch (e) {
+  fs = require('fs')
+}
 var url = require('url')
 var zlib = require('zlib')
 var Neg = require('negotiator')
