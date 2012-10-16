@@ -3,6 +3,7 @@
   "version": "0.0.7",
   "description": "A module for serving static files.  Does etags, caching, etc.",
   "main": "st.js",
+  "bin": "bin/server.js",
   "dependencies": {
     "lru-cache": "~2.0.0",
     "mime": "~1.2.7",

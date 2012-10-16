@@ -210,12 +210,15 @@ Mount.prototype.serve = function (req, res, next) {
         res.end()
         return
       }
+
       res.setHeader('cache-control', 'public')
       res.setHeader('last-modified', stat.mtime.toUTCString())
       res.setHeader('etag', etag)
+
       if (stat.isDirectory()) {
         return this.index(p, req, res)
       }
+
       return this.file(p, fd, stat, etag, req, res)
     }.bind(this));
   }.bind(this));
@@ -305,6 +308,9 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
   var streamOpt = { fd: fd, start: 0, end: stat.size }
   var stream = fs.createReadStream(p, streamOpt)
   stream.destroy = function () {}
+
+  // make sure it knows that we're using this right now.
+  streaming[p] = fd
 
   // too late to effectively handle any errors.
   // just kill the connection if that happens.
