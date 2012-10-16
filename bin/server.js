@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 var st = require('../st.js')
 var http = require('http')
 var port = +(process.env.PORT || 1337)
