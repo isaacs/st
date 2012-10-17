@@ -193,7 +193,7 @@ Mount.prototype.serve = function (req, res, next) {
   this.cache.fd.get(p, function (er, fd) {
     // inability to open is some kind of error, probably 404
     if (er) {
-      if (this.opt.passthrough === true && er === 'ENOENT') return next();
+      if (this.opt.passthrough === true && er.code === 'ENOENT') return next();
       return this.error(er, res)
     }
 
