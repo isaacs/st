@@ -60,11 +60,13 @@ function shouldClose (path, fd) {
   // means that this fd is no longer in the fd lru.
   // however, if any requests are still in process, then
   // don't close it yet, or that'll cause problems.
-  if (!streaming[path]) {
-    delete pendingClose[path]
+  if (!streaming[path] && !streaming[fd + ':' + path]) {
+    delete streaming[path]
+    delete streaming[fd + ':' + path]
+    delete pendingClose[fd + ':' + path]
     return fs.close(fd, function () {})
   }
-  pendingClose[path] = fd
+  pendingClose[fd + ':' + path] = fd
 }
 
 
@@ -315,11 +317,12 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
 
   // make sure it knows that we're using this right now.
   streaming[p] = fd
+  streaming[fd + ':' + p] = (streaming[fd + ':' + p] || 0) + 1
 
   // too late to effectively handle any errors.
   // just kill the connection if that happens.
   stream.on('error', function(e) {
-    console.error('Error serving %s\n%s', p, e.stack || e.message)
+    console.error('Error serving %s fd=%d\n%s', p, fd, e.stack || e.message)
     res.socket.destroy()
   })
 
@@ -343,11 +346,19 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
   }
 
   stream.on('end', function () {
-    delete streaming[p]
-    if (!pendingClose[p])
+    streaming[fd + ':' + p]--
+
+    if (streaming[fd + ':' + p] > 0)
       return
+
+    delete streaming[fd + ':' + p]
+    delete streaming[p]
+
+    if (!pendingClose[fd + ':' + p])
+      return
+
     fs.close(fd, function () {})
-    delete pendingClose[p]
+    delete pendingClose[fd + ':' + p]
   })
 
   if (this.cache.content._cache.max > stat.size) {
@@ -461,10 +472,16 @@ Mount.prototype._loadStat = function (key, cb) {
 }
 
 Mount.prototype._loadFd = function (path, cb) {
+  // If the file is already open and in use, then just use that.
+  if (streaming[path])
+    return cb(null, streaming[path])
+
   // if we were about to close it, just don't.
   fs.open(path, 'r', function (er, fd) {
-    if (!er)
+    if (!er) {
+      streaming[fd + ':' + path] = 0
       streaming[path] = fd
+    }
     cb(er, fd)
   })
 }

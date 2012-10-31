@@ -14,14 +14,24 @@ var http = require('http')
 var mount1 = st({
   autoindex: true,
   path: path.dirname(__dirname),
-  url: '/test'
+  url: '/test',
+  cache: {
+    fd: {
+      max: 3
+    }
+  }
 })
 
 // mount the test dir on the /blerg url
 var mount2 = st({
   autoindex: true,
   path: __dirname,
-  url: '/blerg'
+  url: '/blerg',
+  cache: {
+    fd: {
+      max: 3
+    }
+  }
 })
 
 function req (url, headers, cb) {
@@ -106,7 +116,7 @@ test('/test/st.js 304', function (t) {
 })
 
 var mmEtag
-var mmExpect = fs.readFileSync(__filename).toString()
+var mmExpect = fs.readFileSync(__filename, 'utf8')
 test('/blerg/multi-mount.js', function (t) {
   req('/blerg/multi-mount.js', function (er, res, body) {
     t.equal(res.statusCode, 200)
@@ -124,6 +134,78 @@ test('/test/test/multi-mount.js', function (t) {
     t.equal(body.toString(), mmExpect)
     t.end()
   })
+})
+
+
+var rmEtag
+var rmExpect = fs.readFileSync(path.resolve(__dirname, '../README.md'), 'utf8')
+var pjEtag
+var pjExpect = fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')
+var idEtag
+var idExpect = fs.readFileSync(__dirname + '/fixtures/index.html', 'utf8')
+test('just get a few more etags', function(t) {
+  var n = 3
+
+  req('/test/package.json', function (er, res, body) {
+    if (er)
+      throw er
+    t.equal(body.toString(), pjExpect)
+    pjEtag = res.headers.etag
+    if (--n === 0)
+      t.end()
+  })
+
+  req('/test/README.md', function (er, res, body) {
+    if (er)
+      throw er
+    t.equal(body.toString(), rmExpect)
+    rmEtag = res.headers.etag
+    if (--n === 0)
+      t.end()
+  })
+
+  req('/test/test/fixtures/index.html', function (er, res, body) {
+    if (er)
+      throw er
+    t.equal(body.toString(), idExpect)
+    idEtag = res.headers.etag
+    if (--n === 0)
+      t.end()
+  })
+})
+
+test('many parallel requests', function (t) {
+  var n = 50
+  var reqs =
+    [ ['/test/test/multi-mount.js', mmEtag, mmExpect],
+      ['/blerg/multi-mount.js', mmEtag, mmExpect],
+      ['/test/st.js', stEtag, stExpect],
+      ['/test/README.md', rmEtag, rmExpect],
+      ['/test/package.json', pjEtag, pjExpect],
+      ['/test/test/fixtures/index.html', idEtag, idExpect],
+      ['/blerg/fixtures/index.html', idEtag, idExpect] ]
+
+  var total = n * reqs.length
+
+  for (var i = 0; i < n; i ++) {
+    reqs.forEach(function (r) {
+      req(r[0], next(r))
+    })
+  }
+
+  function next (r) { return function (er, res, body) {
+    if (er)
+      throw er
+
+    t.pass(r[0])
+    t.ok(res)
+    t.ok(res.headers)
+    t.equal(res.headers.etag, r[1])
+    t.equal(body.toString(), r[2].toString())
+
+    if (--total === 0)
+      t.end()
+  }}
 })
 
 test('shutdown regular server', function (t) {
