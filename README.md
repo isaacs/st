@@ -44,6 +44,9 @@ var mount = st({
 
   dot: false, // default: return 403 for any url with a dot-file part
   dot: true, // allow dot-files to be fetched normally
+
+  passthrough: true, // calls next instead of returning a 404 error
+  passthrough: false, // returns a 404 when a file or an index is not found
 })
 
 // with bare node.js
