@@ -4,7 +4,7 @@ var util = require('util')
 var path = require('path')
 
 var opts = util._extend({
-  autoindex: true,
+  index: false,
   path: path.resolve(__dirname, './fixtures'),
   url: '/',
   passthrough: true
@@ -21,12 +21,15 @@ test('call next() if passthrough is set', function (t) {
     setHeader: function () {},
     end: function () {}
   }
-  t.plan(1)
-  function next() {
-    t.ok(true, "next called")
-    t.end()
-  }
-  mount(req, res, next)
+  t.plan(2)
+  mount(req, res, function () {
+    t.ok(true, "next called with nonexistant file");
+    req.url='/';
+    mount(req, res, function () {
+      t.ok(true, "next called without indexing")
+      t.end()
+    });
+  })
 })
 
 var opts2 = util._extend({
