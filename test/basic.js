@@ -5,7 +5,8 @@ var http = require('http')
 var server
 var st = require('../st.js')
 var request = require('request')
-var test = require('tap').test
+var tap = require('tap')
+var test = tap.test
 var port = process.env.PORT || 1337
 var util = require('util')
 
@@ -16,6 +17,8 @@ var opts = util._extend({
 }, global.options || {})
 
 var mount = st(opts)
+exports.mount = mount
+exports.req = req
 
 function req (url, headers, cb) {
   if (typeof headers === 'function') cb = headers, headers = {}
@@ -35,6 +38,11 @@ test('setup', function (t) {
     t.end()
   })
 })
+
+tap.tearDown(function() {
+  server.close()
+})
+
 
 var stEtag
 var stExpect = fs.readFileSync(require.resolve('../st.js')).toString()
@@ -104,11 +112,4 @@ test('multiball!', function (t) {
     if (--n === 0)
       t.end()
   }
-})
-
-test('teardown', function (t) {
-  server.close(function () {
-    t.pass('closed')
-    t.end()
-  })
 })

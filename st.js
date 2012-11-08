@@ -123,8 +123,28 @@ function Mount (opt) {
   };
 }
 
+// lru-cache doesn't like when max=0, so we just pretend
+// everything is really big.  kind of a kludge, but easiest way
+// to get it done
+var none = { max: 1, maxSize: 0, length: function() {
+  return Infinity
+}}
+var noCaching = {
+  fd: none,
+  stat: none,
+  index: none,
+  readdir: none,
+  content: none
+}
+
 Mount.prototype.getCacheOptions = function (opt) {
-  var o = opt.cache || {}
+  var o = opt.cache
+
+  if (o === false)
+    o = noCaching
+  else if (!o)
+    o = {}
+
   var d = defaultCacheOptions
 
   // should really only ever set max and maxAge here.
