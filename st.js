@@ -222,6 +222,9 @@ Mount.prototype.serve = function (req, res, next) {
       res.setHeader('etag', etag)
 
       if (stat.isDirectory()) {
+        if (this.opt.passthrough === true && this._index === false) {
+          return next();
+        }
         return this.index(p, req, res)
       }
 
