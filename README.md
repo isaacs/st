@@ -4,6 +4,8 @@ A module for serving static files.  Does etags, caching, etc.
 
 ## USAGE
 
+In your JavaScript program:
+
 ```javascript
 var st = require('st')
 var mount = st({
@@ -63,9 +65,53 @@ app.route('/static/:fooblz', function (req, res, next) {
 })
 ```
 
+On the command line:
+
+```
+$ st -h
+st
+Static file server in node
+
+Options:
+
+-h --help             Show this help
+
+-p --port PORT        Listen on PORT (default=1337)
+
+-d --dir DIRECTORY    Serve the contents of DIRECTORY (default=cwd)
+
+-i --index [INDEX]    Use the specified INDEX filename as the result
+                      when a directory is requested.  Set to "true"
+                      to turn autoindexing on, or "false" to turn it
+                      off.  If no INDEX is provided, then it will turn
+                      autoindexing on.  (default=true)
+
+-ni --no-index        Same as "--index false"
+
+-. --dot [DOT]        Allow .files to be served.  Set to "false" to
+                      disable.
+
+-n. --no-dot          Same as "--dot false"
+
+-nc --no-cache        Turn off all caching.
+
+-a --age AGE          Max age (in ms) of cache entries.
+```
+
 ## Range Requests
 
-Range requests are not supported yet.
+Range requests are not supported.
+
+I'd love a patch to add support for them, but the spec is kind of
+confusing, and it's not always a clear win if you're not serving very
+large files, so it should come with some very comprehensive tests.
+
+Thankfully, as far as I can tell, it's always safe to serve the entire
+file to a request with a range header, so st does behave correctly, if
+not ideally in those situations.  It'd be great to be able to do the
+better thing if the contents are cached, but still serve the full file
+if it's not in cache (so that it can be cached for subsequent
+requests).
 
 ## Memory Caching
 
@@ -79,6 +125,9 @@ always be faster than hitting the file system.
 An etag header and last-modified will be attached to every request.
 If presented with an `if-none-match` or `if-modified-since`, then
 it'll return a 304 in the appropriate conditions.
+
+The etag is generated based on the dev, ino, and last modified date.
+Stat results are cached.
 
 ## Compression
 
