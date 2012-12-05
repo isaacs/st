@@ -61,8 +61,8 @@ function req (url, headers, cb) {
       assert(Math.abs(new Date(res.headers.date).getTime() -
                       new Date(res.headers.date).getTime()) < 1000)
       // compare the headers minus the 'date' value
-      assert.deepEqual(Object.create(res.headers, { date: { value: '' } }),
-                       Object.create(prev.res.headers, { date: { value: '' } }))
+      res.headers.date = prev.res.headers.date = null
+      assert.deepEqual(res.headers, prev.res.headers)
       assert.equal('' + body, '' + prev.body)
       return cb(er, res, body)
     }
