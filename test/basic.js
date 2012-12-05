@@ -49,6 +49,7 @@ var stExpect = fs.readFileSync(require.resolve('../st.js')).toString()
 test('simple request', function (t) {
   req('/test/st.js', function (er, res, body) {
     t.equal(res.statusCode, 200)
+    t.ok(/\/javascript$/.test(res.headers['content-type']))
     t.ok(res.headers.etag)
     stEtag = res.headers.etag
     t.equal(body.toString(), stExpect)
