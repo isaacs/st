@@ -57,6 +57,11 @@ function req (url, headers, cb) {
     if (++reqs === 2) {
       console.error('done with reqs')
       assert.equal(res.statusCode, prev.res.statusCode)
+      // compare dates, they should be approximately the same
+      assert(Math.abs(new Date(res.headers.date).getTime() -
+                      new Date(res.headers.date).getTime()) < 1000)
+      // compare the headers minus the 'date' value
+      res.headers.date = prev.res.headers.date = null
       assert.deepEqual(res.headers, prev.res.headers)
       assert.equal('' + body, '' + prev.body)
       return cb(er, res, body)
