@@ -169,7 +169,7 @@ Mount.prototype.getCacheOptions = function (opt) {
 
 // get a path from a url
 Mount.prototype.getPath = function (u) {
-  u = path.join('/', url.parse(u).pathname).replace(/\\/g, '/')
+  u = path.normalize(url.parse(u).pathname.replace(/^[\/\\]?/, '/')).replace(/\\/g, '/')
   if (u.indexOf(this.url) !== 0) return false;
 
   // /a/b/c mounted on /path/to/z/d/x
