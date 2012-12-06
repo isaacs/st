@@ -302,11 +302,13 @@ Mount.prototype.autoindex = function (p, req, res) {
 
 
 Mount.prototype.file = function (p, fd, stat, etag, req, res) {
-  var key = fd + ':' + stat.size + ':' + etag
+  var key = stat.size + ':' + etag
+
   var mt = mime.lookup(path.extname(p))
   if (mt !== 'application/octet-stream') {
     res.setHeader('content-type', mt)
   }
+
   // only use the content cache if it will actually fit there.
   if (this.cache.content.has(key)) {
     this.cachedFile(p, fd, stat, etag, req, res)
@@ -316,7 +318,7 @@ Mount.prototype.file = function (p, fd, stat, etag, req, res) {
 }
 
 Mount.prototype.cachedFile = function (p, fd, stat, etag, req, res) {
-  var key = fd + ':' + stat.size + ':' + etag
+  var key = stat.size + ':' + etag
   var gz = getGz(p, req)
 
   this.cache.content.get(key, function (er, content) {
