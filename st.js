@@ -4,7 +4,6 @@ st.Mount = Mount
 
 var mime = require('mime')
 var path = require('path')
-var LRU = require('lru-cache')
 var fs
 try {
   fs = require('graceful-fs')
@@ -139,6 +138,11 @@ var noCaching = {
 
 Mount.prototype.getCacheOptions = function (opt) {
   var o = opt.cache
+    , set = function (key) {
+        return o[key] === false
+          ? none
+          : util._extend(util._extend({}, d[key]), o[key])
+      }
 
   if (o === false)
     o = noCaching
@@ -150,12 +154,14 @@ Mount.prototype.getCacheOptions = function (opt) {
   // should really only ever set max and maxAge here.
   // load and fd disposal is important to control.
   var c = {
-    fd: util._extend(util._extend({}, d.fd), o.fd),
-    stat: util._extend(util._extend({}, d.stat), o.stat),
-    index: util._extend(util._extend({}, d.index), o.index),
-    readdir: util._extend(util._extend({}, d.readdir), o.readdir),
-    content: util._extend(util._extend({}, d.content), o.content)
+    fd: set('fd'),
+    stat: set('stat'),
+    index: set('index'),
+    readdir: set('readdir'),
+    content: set('content'),
   }
+
+  util.print('cache: ' + JSON.stringify(c, null, 1) + '\n')
 
   c.fd.dispose = shouldClose
   c.fd.load = this._loadFd.bind(this)
