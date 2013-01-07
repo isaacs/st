@@ -23,7 +23,6 @@ var defaultCacheOptions = {
   fd: {
     max: 1000,
     maxAge: 1000 * 60 * 60,
-    dispose: shouldClose
   },
   stat: {
     max: 5000,
@@ -51,24 +50,6 @@ var defaultCacheOptions = {
     maxAge: 1000 * 60 * 10
   }
 }
-
-
-var streaming = Object.create(null)
-var pendingClose = Object.create(null)
-
-function shouldClose (path, fd) {
-  // means that this fd is no longer in the fd lru.
-  // however, if any requests are still in process, then
-  // don't close it yet, or that'll cause problems.
-  if (!streaming[path] && !streaming[fd + ':' + path]) {
-    delete streaming[path]
-    delete streaming[fd + ':' + path]
-    delete pendingClose[fd + ':' + path]
-    return fs.close(fd, function () {})
-  }
-  pendingClose[fd + ':' + path] = fd
-}
-
 
 function st (opt) {
   var p, u
@@ -111,6 +92,7 @@ function Mount (opt) {
   this._index = opt.index === false ? false
               : typeof opt.index === 'string' ? opt.index
               : true
+  this.fdManager = new FDManager()
 
   // cache basically everything
   var c = this.getCacheOptions(opt)
@@ -157,15 +139,14 @@ Mount.prototype.getCacheOptions = function (opt) {
     content: util._extend(util._extend({}, d.content), o.content)
   }
 
-  c.fd.dispose = shouldClose
-  c.fd.load = this._loadFd.bind(this)
+  c.fd.dispose = this.fdManager.shouldClose.bind(this.fdManager)
+  c.fd.load = this.fdManager.loadFd.bind(this.fdManager)
   c.stat.load = this._loadStat.bind(this)
   c.index.load = this._loadIndex.bind(this)
   c.readdir.load = this._loadReaddir.bind(this)
   c.content.load = this._loadContent.bind(this)
   return c
 }
-
 
 // get a path from a url
 Mount.prototype.getPath = function (u) {
@@ -219,22 +200,29 @@ Mount.prototype.serve = function (req, res, next) {
       return this.error(er, res)
     }
 
+    // we may be about to use this, so don't let it be closed by cache purge
+    this.fdManager.incrementUsing(p, fd)
+    var end = this.fdManager.decrementUsing.bind(this.fdManager, p, fd)
+
     this.cache.stat.get(fd+':'+p, function (er, stat) {
-      if (er) return this.error(er, res);
+      if (er) {
+        end()
+        return this.error(er, res);
+      }
 
       var ims = req.headers['if-modified-since']
       if (ims) ims = new Date(ims).getTime();
       if (ims && ims >= stat.mtime.getTime()) {
         res.statusCode = 304
         res.end()
-        return
+        return end()
       }
 
       var etag = getEtag(stat)
       if (req.headers['if-none-match'] === etag) {
         res.statusCode = 304
         res.end()
-        return
+        return end()
       }
 
       res.setHeader('cache-control', 'public')
@@ -242,13 +230,14 @@ Mount.prototype.serve = function (req, res, next) {
       res.setHeader('etag', etag)
 
       if (stat.isDirectory()) {
+        end()
         if (this.opt.passthrough === true && this._index === false) {
           return next();
         }
         return this.index(p, req, res)
       }
 
-      return this.file(p, fd, stat, etag, req, res)
+      return this.file(p, fd, stat, etag, req, res, end)
     }.bind(this));
   }.bind(this));
 
@@ -301,7 +290,7 @@ Mount.prototype.autoindex = function (p, req, res) {
 }
 
 
-Mount.prototype.file = function (p, fd, stat, etag, req, res) {
+Mount.prototype.file = function (p, fd, stat, etag, req, res, end) {
   var key = stat.size + ':' + etag
 
   var mt = mime.lookup(path.extname(p))
@@ -311,13 +300,14 @@ Mount.prototype.file = function (p, fd, stat, etag, req, res) {
 
   // only use the content cache if it will actually fit there.
   if (this.cache.content.has(key)) {
-    this.cachedFile(p, fd, stat, etag, req, res)
+    end()
+    this.cachedFile(p, stat, etag, req, res)
   } else {
-    this.streamFile(p, fd, stat, etag, req, res)
+    this.streamFile(p, fd, stat, etag, req, res, end)
   }
 }
 
-Mount.prototype.cachedFile = function (p, fd, stat, etag, req, res) {
+Mount.prototype.cachedFile = function (p, stat, etag, req, res) {
   var key = stat.size + ':' + etag
   var gz = getGz(p, req)
 
@@ -335,14 +325,10 @@ Mount.prototype.cachedFile = function (p, fd, stat, etag, req, res) {
   }.bind(this));
 }
 
-Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
+Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
   var streamOpt = { fd: fd, start: 0, end: stat.size }
   var stream = fs.createReadStream(p, streamOpt)
   stream.destroy = function () {}
-
-  // make sure it knows that we're using this right now.
-  streaming[p] = fd
-  streaming[fd + ':' + p] = (streaming[fd + ':' + p] || 0) + 1
 
   // too late to effectively handle any errors.
   // just kill the connection if that happens.
@@ -370,21 +356,7 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res) {
     stream.pipe(res)
   }
 
-  stream.on('end', function () {
-    streaming[fd + ':' + p]--
-
-    if (streaming[fd + ':' + p] > 0)
-      return
-
-    delete streaming[fd + ':' + p]
-    delete streaming[p]
-
-    if (!pendingClose[fd + ':' + p])
-      return
-
-    fs.close(fd, function () {})
-    delete pendingClose[fd + ':' + p]
-  })
+  stream.on('end', process.nextTick.bind(process, end))
 
   if (this.cache.content._cache.max > stat.size) {
     // collect it, and put it in the cache
@@ -496,21 +468,6 @@ Mount.prototype._loadStat = function (key, cb) {
   }
 }
 
-Mount.prototype._loadFd = function (path, cb) {
-  // If the file is already open and in use, then just use that.
-  if (streaming[path])
-    return cb(null, streaming[path])
-
-  // if we were about to close it, just don't.
-  fs.open(path, 'r', function (er, fd) {
-    if (!er) {
-      streaming[fd + ':' + path] = 0
-      streaming[path] = fd
-    }
-    cb(er, fd)
-  })
-}
-
 Mount.prototype._loadContent = function (key, cb) {
   // this function should never be called.
   // we check if the thing is in the cache, and if not, stream it in
@@ -529,4 +486,72 @@ function getGz (p,req) {
     gz = neg.preferredEncoding(['gzip', 'identity']) === 'gzip'
   }
   return gz
+}
+
+/*
+ * FDManager handles opening, closing & fetching fds for paths
+ */
+
+module.exports._totalOpenFds = 0 // across all Mounts
+
+function FDManager () {
+  // in use
+  this._usingfd = Object.create(null)
+  // needs to be closed at next available opportunity
+  this._pendingClose = Object.create(null)
+}
+
+// called when the fd *may* be used by Mount
+// must be matched with a decrementUsing()
+FDManager.prototype.incrementUsing = function (path, fd) {
+  this._usingfd[path] = fd
+  this._usingfd[fd + ':' + path] = (this._usingfd[fd + ':' + path] || 0) + 1
+}
+
+// clear the use counter & close if pending
+FDManager.prototype._cleanupFd = function (path, fd) {
+  delete this._usingfd[fd + ':' + path]
+  delete this._usingfd[path]
+
+  if (this._pendingClose[fd + ':' + path]) {
+    fs.close(fd, function () {})
+    module.exports._totalOpenFds--
+    delete this._pendingClose[fd + ':' + path]
+  }
+}
+
+// called when the fd is no longer needed my Mount
+FDManager.prototype.decrementUsing = function (path, fd) {
+  if (this._usingfd[path] && --this._usingfd[fd + ':' + path] === 0)
+    this._cleanupFd(path, fd)
+}
+
+// called by the fd cache to close an fd that is being purged
+// if it's being currently used then don't close it yet
+FDManager.prototype.shouldClose = function (path, fd) {
+  this._pendingClose[fd + ':' + path] = fd
+  // nextTick needed to match the nextTick in AC otherwise we may
+  // close it in the tick prior to it being actually needed
+  process.nextTick(function () {
+    if (!this._usingfd[fd + ':' + path])
+      this._cleanupFd(path, fd)
+  }.bind(this))
+}
+
+// open an fd, called by the fd cache
+FDManager.prototype.loadFd = function (path, cb) {
+  // If the file is already open and in use but not with a close pending
+  // then just use that.  
+  if (this._usingfd[path] && !this._pendingClose[this._usingfd[path] + ':' + path])
+    return cb(null, this._usingfd[path])
+
+  fs.open(path, 'r', function (er, fd) {
+    if (!er) {
+      module.exports._totalOpenFds++
+      this._usingfd[path] = fd
+      this._usingfd[fd + path] = 0
+    }
+
+    cb(er, fd)
+  }.bind(this))
 }
