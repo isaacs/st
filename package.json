@@ -9,7 +9,7 @@
     "mime": "~1.2.7",
     "negotiator": "~0.2.5",
     "async-cache": "~0.0.2",
-    "fd": "~0.0.1"
+    "fd": "~0.0.2"
   },
   "optionalDependencies": {
     "graceful-fs": "~1.1.13"
