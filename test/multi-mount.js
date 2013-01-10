@@ -209,7 +209,7 @@ test('many parallel requests', function (t) {
 
     if (--total === 0) {
       process.nextTick(function () {
-        t.ok(st._totalOpenFds <= 6) // max of 3 fds per mount
+        t.ok(require('fd')._totalOpenFds <= 6) // max of 3 fds per mount
         t.end()
       })
     }

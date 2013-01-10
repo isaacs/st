@@ -17,6 +17,7 @@ var Neg = require('negotiator')
 var http = require('http')
 var AC = require('async-cache')
 var util = require('util')
+var FD = require('fd')
 
 // default caching options
 var defaultCacheOptions = {
@@ -92,7 +93,7 @@ function Mount (opt) {
   this._index = opt.index === false ? false
               : typeof opt.index === 'string' ? opt.index
               : true
-  this.fdManager = new FDManager()
+  this.fdman = FD()
 
   // cache basically everything
   var c = this.getCacheOptions(opt)
@@ -139,8 +140,8 @@ Mount.prototype.getCacheOptions = function (opt) {
     content: util._extend(util._extend({}, d.content), o.content)
   }
 
-  c.fd.dispose = this.fdManager.shouldClose.bind(this.fdManager)
-  c.fd.load = this.fdManager.loadFd.bind(this.fdManager)
+  c.fd.dispose = this.fdman.close.bind(this.fdman)
+  c.fd.load = this.fdman.open.bind(this.fdman)
   c.stat.load = this._loadStat.bind(this)
   c.index.load = this._loadIndex.bind(this)
   c.readdir.load = this._loadReaddir.bind(this)
@@ -201,8 +202,10 @@ Mount.prototype.serve = function (req, res, next) {
     }
 
     // we may be about to use this, so don't let it be closed by cache purge
-    this.fdManager.incrementUsing(p, fd)
-    var end = this.fdManager.decrementUsing.bind(this.fdManager, p, fd)
+    this.fdman.checkout(p, fd)
+    // a safe end() function that can be called multiple times but
+    // only perform a single checkin
+    var end = this.fdman.checkinfn(p, fd)
 
     this.cache.stat.get(fd+':'+p, function (er, stat) {
       if (er) {
@@ -335,6 +338,7 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
   stream.on('error', function(e) {
     console.error('Error serving %s fd=%d\n%s', p, fd, e.stack || e.message)
     res.socket.destroy()
+    end()
   })
 
   if (res.filter) {
@@ -486,72 +490,4 @@ function getGz (p,req) {
     gz = neg.preferredEncoding(['gzip', 'identity']) === 'gzip'
   }
   return gz
-}
-
-/*
- * FDManager handles opening, closing & fetching fds for paths
- */
-
-module.exports._totalOpenFds = 0 // across all Mounts
-
-function FDManager () {
-  // in use
-  this._usingfd = Object.create(null)
-  // needs to be closed at next available opportunity
-  this._pendingClose = Object.create(null)
-}
-
-// called when the fd *may* be used by Mount
-// must be matched with a decrementUsing()
-FDManager.prototype.incrementUsing = function (path, fd) {
-  this._usingfd[path] = fd
-  this._usingfd[fd + ':' + path] = (this._usingfd[fd + ':' + path] || 0) + 1
-}
-
-// clear the use counter & close if pending
-FDManager.prototype._cleanupFd = function (path, fd) {
-  delete this._usingfd[fd + ':' + path]
-  delete this._usingfd[path]
-
-  if (this._pendingClose[fd + ':' + path]) {
-    fs.close(fd, function () {})
-    module.exports._totalOpenFds--
-    delete this._pendingClose[fd + ':' + path]
-  }
-}
-
-// called when the fd is no longer needed my Mount
-FDManager.prototype.decrementUsing = function (path, fd) {
-  if (this._usingfd[path] && --this._usingfd[fd + ':' + path] === 0)
-    this._cleanupFd(path, fd)
-}
-
-// called by the fd cache to close an fd that is being purged
-// if it's being currently used then don't close it yet
-FDManager.prototype.shouldClose = function (path, fd) {
-  this._pendingClose[fd + ':' + path] = fd
-  // nextTick needed to match the nextTick in AC otherwise we may
-  // close it in the tick prior to it being actually needed
-  process.nextTick(function () {
-    if (!this._usingfd[fd + ':' + path])
-      this._cleanupFd(path, fd)
-  }.bind(this))
-}
-
-// open an fd, called by the fd cache
-FDManager.prototype.loadFd = function (path, cb) {
-  // If the file is already open and in use but not with a close pending
-  // then just use that.  
-  if (this._usingfd[path] && !this._pendingClose[this._usingfd[path] + ':' + path])
-    return cb(null, this._usingfd[path])
-
-  fs.open(path, 'r', function (er, fd) {
-    if (!er) {
-      module.exports._totalOpenFds++
-      this._usingfd[path] = fd
-      this._usingfd[fd + path] = 0
-    }
-
-    cb(er, fd)
-  }.bind(this))
 }
