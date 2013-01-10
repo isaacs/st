@@ -1,7 +1,6 @@
 var st = require('../st.js')
 var test = require('tap').test
 var port = process.env.PORT || 1337
-var util = require('util')
 var path = require('path')
 var request = require('request')
 var middlewareServer
@@ -208,8 +207,12 @@ test('many parallel requests', function (t) {
     t.equal(res.headers.etag, r[1])
     t.equal(body.toString(), r[2].toString())
 
-    if (--total === 0)
-      t.end()
+    if (--total === 0) {
+      process.nextTick(function () {
+        t.ok(require('fd')._totalOpenFds <= 6) // max of 3 fds per mount
+        t.end()
+      })
+    }
   }}
 })
 
