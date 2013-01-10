@@ -8,7 +8,8 @@
     "lru-cache": "~2.0.0",
     "mime": "~1.2.7",
     "negotiator": "~0.2.5",
-    "async-cache": "~0.0.2"
+    "async-cache": "~0.0.2",
+    "fd": "~0.0.1"
   },
   "optionalDependencies": {
     "graceful-fs": "~1.1.13"
