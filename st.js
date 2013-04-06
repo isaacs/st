@@ -365,7 +365,9 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
     stream.pipe(res)
   }
 
-  stream.on('end', process.nextTick.bind(process, end))
+  stream.on('end', function () {
+    process.nextTick(end)
+  })
 
   if (this.cache.content._cache.max > stat.size) {
     // collect it, and put it in the cache
