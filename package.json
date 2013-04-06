@@ -5,14 +5,13 @@
   "main": "st.js",
   "bin": "bin/server.js",
   "dependencies": {
-    "lru-cache": "~2.0.0",
     "mime": "~1.2.7",
     "negotiator": "~0.2.5",
-    "async-cache": "~0.0.2",
+    "async-cache": "~0.1.2",
     "fd": "~0.0.2"
   },
   "optionalDependencies": {
-    "graceful-fs": "~1.1.13"
+    "graceful-fs": "~1.2"
   },
   "devDependencies": {
     "tap": "~0.3.1",
