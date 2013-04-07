@@ -74,12 +74,12 @@ for (var i = 2; i < process.argv.length; i++) {
   }
 }
 
-function grabAchunk (ƒ) {
+function grabAchunk (ƒ, s, e) {
   //2010-10-27 jorge@jorgechamorro.com
-  return ƒ.toString().split('\n').filter(function ƒ (v,i,o) {
-    ƒ.e|= i * (v === 'END*/');
-    ƒ.s|= i * (v === '/*BEGIN');
-    return !ƒ.e && ƒ.s && (i > ƒ.s);
+  return ƒ.toString().split('\n').filter(function (v,i,o) {
+    e|= i * (v === 'END*/');
+    s|= i * (v === '/*BEGIN');
+    return !e && s && (i > s);
   }).join('\n');
 }
 
