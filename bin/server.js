@@ -74,36 +74,48 @@ for (var i = 2; i < process.argv.length; i++) {
   }
 }
 
+function grabAchunk (ƒ) {
+  //2010-10-27 jorge@jorgechamorro.com
+  return ƒ.toString().split('\n').filter(function ƒ (v,i,o) {
+    ƒ.e|= i * (v === 'END*/');
+    ƒ.s|= i * (v === '/*BEGIN');
+    return !ƒ.e && ƒ.s && (i > ƒ.s);
+  }).join('\n');
+}
+
 function help () {
-  console.log(
-['st'
-,'Static file server in node'
-,''
-,'Options:'
-,''
-,'-h --help             Show this help'
-,''
-,'-p --port PORT        Listen on PORT (default=1337)'
-,''
-,'-d --dir DIRECTORY    Serve the contents of DIRECTORY (default=cwd)'
-,''
-,'-i --index [INDEX]    Use the specified INDEX filename as the result'
-,'                      when a directory is requested.  Set to "true"'
-,'                      to turn autoindexing on, or "false" to turn it'
-,'                      off.  If no INDEX is provided, then it will turn'
-,'                      autoindexing on.  (default=true)'
-,''
-,'-ni --no-index        Same as "--index false"'
-,''
-,'-. --dot [DOT]        Allow .files to be served.  Set to "false" to'
-,'                      disable.'
-,''
-,'-n. --no-dot          Same as "--dot false"'
-,''
-,'-nc --no-cache        Turn off all caching.'
-,''
-,'-a --age AGE          Max age (in ms) of cache entries.'
-].join('\n'))
+  console.log(grabAchunk(help))
+    
+/*BEGIN
+st
+Static file server in node
+
+Options:
+
+-h --help             Show this help
+
+-p --port PORT        Listen on PORT (default=1337)
+
+-d --dir DIRECTORY    Serve the contents of DIRECTORY (default=cwd)
+
+-i --index [INDEX]    Use the specified INDEX filename as the result
+                      when a directory is requested.  Set to "true"
+                      to turn autoindexing on, or "false" to turn it
+                      off.  If no INDEX is provided, then it will turn
+                      autoindexing on.  (default=true)
+
+-ni --no-index        Same as "--index false"
+
+-. --dot [DOT]        Allow .files to be served.  Set to "false" to
+                      disable.
+
+-n. --no-dot          Same as "--dot false"
+
+-nc --no-cache        Turn off all caching.
+
+-a --age AGE          Max age (in ms) of cache entries.
+
+END*/
 }
 
 if (isNaN(port)) throw new Error('invalid port: '+port)
