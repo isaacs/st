@@ -74,9 +74,9 @@ for (var i = 2; i < process.argv.length; i++) {
   }
 }
 
-function grabAchunk (ƒ, s, e) {
+function grabAchunk (is, awe, s, om, e) {
   //2010-10-27 jorge@jorgechamorro.com
-  return ƒ.toString().split('\n').filter(function (v,i,o) {
+  return is.toString().split('\n').filter(function (v,i,o) {
     e|= i * (v === 'END*/');
     s|= i * (v === '/*BEGIN');
     return !e && s && (i > s);
