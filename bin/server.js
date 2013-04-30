@@ -25,8 +25,8 @@ for (var i = 2; i < process.argv.length; i++) {
     case '--dot':
       dot = process.argv[++i]
       if (dot === undefined || dot === 'true') dot = true
-      if (dot === 'false') dot = false
-      if (dot.charAt(0) === '-') {
+      else if (dot === 'false') dot = false
+      else if (dot.charAt(0) === '-') {
         --i
         dot = true
       }
