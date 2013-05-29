@@ -17,9 +17,9 @@ http.createServer(
 
 // serve the files in static under the /static url
 // otherwise do a different thing
-var static = st({ path: __dirname + '/static', url: '/static' })
+var mount = st({ path: __dirname + '/static', url: '/static' })
 http.createServer(function(req, res) {
-  if (static(req, res)) {
+  if (mount(req, res)) {
     // handled
     return
   }
@@ -28,12 +28,12 @@ http.createServer(function(req, res) {
 
 // serve the files in static under the / url, but only if not
 // some doing other thing
-var static = st({ path: __dirname + '/static', url: '/' })
+var mount = st({ path: __dirname + '/static', url: '/' })
 http.createServer(function(req, res) {
   if (shouldDoThing(req)) {
     doTheThing(req, res)
   } else {
-    static(req, res)
+    mount(req, res)
   }
 })
 ```
