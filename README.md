@@ -10,10 +10,32 @@ Very simple usage examples:
 var st = require('st')
 var http = require('http')
 
-// Just serve the files in '/static' under the url '/static'
+// Just serve the files in the cwd
 http.createServer(
   st(process.cwd())
 ).listen(1337)
+
+// serve the files in static under the /static url
+// otherwise do a different thing
+var static = st({ path: __dirname + '/static', url: '/static' })
+http.createServer(function(req, res) {
+  if (static(req, res)) {
+    // handled
+    return
+  }
+  res.end('this is not a static file')
+}).listen(1338)
+
+// serve the files in static under the / url, but only if not
+// some doing other thing
+var static = st({ path: __dirname + '/static', url: '/' })
+http.createServer(function(req, res) {
+  if (shouldDoThing(req)) {
+    doTheThing(req, res)
+  } else {
+    static(req, res)
+  }
+})
 ```
 
 Pass some options to the `st` function, and it returns a handler
