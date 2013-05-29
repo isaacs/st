@@ -4,7 +4,38 @@ A module for serving static files.  Does etags, caching, etc.
 
 ## USAGE
 
-In your JavaScript program:
+Very simple usage examples:
+
+```javascript
+var st = require('st')
+var http = require('http')
+
+// Just serve the files in '/static' under the url '/static'
+http.createServer(
+  st(process.cwd())
+).listen(1337)
+```
+
+Pass some options to the `st` function, and it returns a handler
+function.
+
+That handler function will return `true` if it handles the static
+request, or `false` if it doesn't.  (This is so that you can only
+serve static files if they're in `/static` for example.)
+
+Here are some options if you want to configure stuff.  All of these
+are optional except `path` which tells it where to get stuff from.
+
+If you pass a string instead of an object, then it'll use the string
+as the path.
+
+If you don't specify a `url`, then it'll mount on the portion of the
+resolved path that is above `process.cwd()`.  For example,
+`st('./foo')` will serve the files in `/path/to/cwd/foo/*` if the user
+requests `http://server.com/foo/*`.
+
+Here are all the options described with their defaults values and a
+few possible settings you might choose to use:
 
 ```javascript
 var st = require('st')
@@ -12,7 +43,7 @@ var mount = st({
   path: 'resources/static/',
   url: 'static/', // defaults to path option
 
-  cache: {
+  cache: { // specify cache:false to turn off caching entirely
     fd: {
       max: 1000, // number of fd's to hang on to
       maxAge: 1000*60*60, // amount of ms before fd's expire
@@ -40,7 +71,7 @@ var mount = st({
   },
 
   // indexing options
-  index: true, // auto-index
+  index: true, // auto-index, the default
   index: 'index.html', // use 'index.html' file as the index
   index: false, // return 404's for directories
 
