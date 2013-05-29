@@ -6,15 +6,8 @@ A module for serving static files.  Does etags, caching, etc.
 
 Very simple usage examples:
 
+
 ```javascript
-var st = require('st')
-var http = require('http')
-
-// Just serve the files in the cwd
-http.createServer(
-  st(process.cwd())
-).listen(1337)
-
 // serve the files in static under the /static url
 // otherwise do a different thing
 var mount = st({ path: __dirname + '/static', url: '/static' })
@@ -25,7 +18,9 @@ http.createServer(function(req, res) {
   }
   res.end('this is not a static file')
 }).listen(1338)
+```
 
+```javascript
 // serve the files in static under the / url, but only if not
 // some doing other thing
 var mount = st({ path: __dirname + '/static', url: '/' })
@@ -38,6 +33,19 @@ http.createServer(function(req, res) {
 })
 ```
 
+If you pass a string instead of an object, then it'll use the string
+as the path:
+
+```javascript
+var st = require('st')
+var http = require('http')
+
+// Just serve the files in the cwd
+http.createServer(
+  st(process.cwd())
+).listen(1337)
+```
+
 Pass some options to the `st` function, and it returns a handler
 function.
 
@@ -47,9 +55,6 @@ serve static files if they're in `/static` for example.)
 
 Here are some options if you want to configure stuff.  All of these
 are optional except `path` which tells it where to get stuff from.
-
-If you pass a string instead of an object, then it'll use the string
-as the path.
 
 If you don't specify a `url`, then it'll mount on the portion of the
 resolved path that is above `process.cwd()`.  For example,
