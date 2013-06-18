@@ -142,3 +142,5 @@ http.createServer(function (q, s) {
   s.statusCode = 404
   s.end('not found')
 }).listen(port)
+
+console.log('listening at http://127.0.0.1:' + port);
