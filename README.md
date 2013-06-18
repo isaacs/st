@@ -4,30 +4,50 @@ A module for serving static files.  Does etags, caching, etc.
 
 ## USAGE
 
-Very simple usage examples:
+Here are some very simple usage examples.
+
+Just serve the files in the cwd at the root of the http server url:
 
 ```javascript
 var st = require('st')
 var http = require('http')
 
-// Just serve the files in the cwd
 http.createServer(
   st(process.cwd())
 ).listen(1337)
+```
 
-// serve the files in static under the /static url
-// otherwise do a different thing
+
+Serve the files in static under the /static url.  Otherwise do a
+different thing:
+
+```javascript
 var mount = st({ path: __dirname + '/static', url: '/static' })
 http.createServer(function(req, res) {
-  if (mount(req, res)) {
-    // handled
+  var stHandled = mount(req, res);
+  if (stHandled)
     return
-  }
-  res.end('this is not a static file')
+  else
+    res.end('this is not a static file')
 }).listen(1338)
+```
 
-// serve the files in static under the / url, but only if not
-// some doing other thing
+The same sort of thing, but using an express middleware style:
+
+```javascript
+var mount = st({ path: __dirname + '/static', url: '/static' })
+http.createServer(function(req, res) {
+  mount(req, res, function() {
+    res.end('this is not a static file')
+  })
+}).listen(1339)
+```
+
+
+Serve the files in static under the / url, but only if not some doing
+other thing:
+
+```javascript
 var mount = st({ path: __dirname + '/static', url: '/' })
 http.createServer(function(req, res) {
   if (shouldDoThing(req)) {
@@ -35,8 +55,21 @@ http.createServer(function(req, res) {
   } else {
     mount(req, res)
   }
-})
+}).listen(1340)
 ```
+
+Serve the files in static under the / url, but don't serve a 404 if
+the file isn't found, so that the rest of the app can handle it:
+
+```javascript
+var mount = st({ path: __dirname + '/static', url: '/', passthrough: true })
+http.createServer(function(req, res) {
+  mount(req, res, function() {
+    res.end('this is not a static file');
+  });
+}).listen(1341);
+```
+
 
 Pass some options to the `st` function, and it returns a handler
 function.
@@ -51,10 +84,10 @@ are optional except `path` which tells it where to get stuff from.
 If you pass a string instead of an object, then it'll use the string
 as the path.
 
-If you don't specify a `url`, then it'll mount on the portion of the
-resolved path that is above `process.cwd()`.  For example,
-`st('./foo')` will serve the files in `/path/to/cwd/foo/*` if the user
-requests `http://server.com/foo/*`.
+If you don't specify a `url`, then it'll mount on the `'/'` url, so
+`st({ path: './static/' })` will try to serve `./static/foo.html` when
+the user goes to `http://example.com/foo.html`.  (Note: This behavior
+changed in st 0.2.0.)
 
 Here are all the options described with their defaults values and a
 few possible settings you might choose to use:
@@ -62,8 +95,8 @@ few possible settings you might choose to use:
 ```javascript
 var st = require('st')
 var mount = st({
-  path: 'resources/static/',
-  url: 'static/', // defaults to path option
+  path: 'resources/static/', // resolved against the process cwd
+  url: 'static/', // defaults to '/'
 
   cache: { // specify cache:false to turn off caching entirely
     fd: {
@@ -100,7 +133,7 @@ var mount = st({
   dot: false, // default: return 403 for any url with a dot-file part
   dot: true, // allow dot-files to be fetched normally
 
-  passthrough: true, // calls next instead of returning a 404 error
+  passthrough: true, // calls next/returns instead of returning a 404 error
   passthrough: false, // returns a 404 when a file or an index is not found
 })
 
