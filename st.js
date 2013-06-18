@@ -69,7 +69,7 @@ function st (opt) {
   if (typeof p !== 'string') throw new Error('no path specified')
   p = path.resolve(p)
   if (!u) u = opt.url
-  if (!u) u = p.substr(process.cwd().length).replace(/\\/g, '/')
+  if (!u) u = ''
   if (u.charAt(0) !== '/') u = '/' + u
 
   opt.url = u
@@ -102,7 +102,7 @@ function Mount (opt) {
     index: AC(c.index),
     readdir: AC(c.readdir),
     content: AC(c.content)
-  };
+  }
 }
 
 // lru-cache doesn't like when max=0, so we just pretend
@@ -157,7 +157,7 @@ Mount.prototype.getCacheOptions = function (opt) {
 // get a path from a url
 Mount.prototype.getPath = function (u) {
   u = path.normalize(url.parse(u).pathname.replace(/^[\/\\]?/, '/')).replace(/\\/g, '/')
-  if (u.indexOf(this.url) !== 0) return false;
+  if (u.indexOf(this.url) !== 0) return false
 
   // /a/b/c mounted on /path/to/z/d/x
   // /a/b/c/d --> /path/to/z/d/x/d
@@ -170,7 +170,7 @@ Mount.prototype.getPath = function (u) {
 // get a url from a path
 Mount.prototype.getUrl = function (p) {
   p = path.resolve(p)
-  if (p.indexOf(this.path) !== 0) return false;
+  if (p.indexOf(this.path) !== 0) return false
   p = path.join('/', p.substr(this.path.length))
   var u = path.join(this.url, p).replace(/\\/g, '/')
   return u
@@ -188,7 +188,7 @@ Mount.prototype.serve = function (req, res, next) {
   var p = this.getPath(req.url)
   if (!p) {
     if (typeof next === 'function') next()
-    return false;
+    return false
   }
 
   // don't allow dot-urls by default, unless explicitly allowed.
@@ -201,8 +201,12 @@ Mount.prototype.serve = function (req, res, next) {
   // now we have a path.  check for the fd.
   this.cache.fd.get(p, function (er, fd) {
     // inability to open is some kind of error, probably 404
+    // if we're in passthrough, AND got a next function, we can
+    // fall through to that.  otherwise, we already returned true,
+    // send an error.
     if (er) {
-      if (this.opt.passthrough === true && er.code === 'ENOENT') return next();
+      if (this.opt.passthrough === true && er.code === 'ENOENT' && next)
+        return next()
       return this.error(er, res)
     }
 
@@ -214,12 +218,15 @@ Mount.prototype.serve = function (req, res, next) {
 
     this.cache.stat.get(fd+':'+p, function (er, stat) {
       if (er) {
+        if (next && this.opt.passthrough === true && this._index === false) {
+          return next()
+        }
         end()
-        return this.error(er, res);
+        return this.error(er, res)
       }
 
       var ims = req.headers['if-modified-since']
-      if (ims) ims = new Date(ims).getTime();
+      if (ims) ims = new Date(ims).getTime()
       if (ims && ims >= stat.mtime.getTime()) {
         res.statusCode = 304
         res.end()
@@ -239,24 +246,24 @@ Mount.prototype.serve = function (req, res, next) {
 
       if (stat.isDirectory()) {
         end()
-        if (this.opt.passthrough === true && this._index === false) {
-          return next();
+        if (next && this.opt.passthrough === true && this._index === false) {
+          return next()
         }
         return this.index(p, req, res)
       }
 
       return this.file(p, fd, stat, etag, req, res, end)
-    }.bind(this));
-  }.bind(this));
+    }.bind(this))
+  }.bind(this))
 
-  return true;
+  return true
 }
 
 Mount.prototype.error = function (er, res) {
   res.statusCode = typeof er === 'number' ? er
                  : er.code === 'ENOENT' || er.code === 'EISDIR' ? 404
                  : er.code === 'EPERM' || er.code === 'EACCES' ? 403
-                 : 500;
+                 : 500
 
   if (typeof res.error === 'function') {
     // pattern of express and ErrorPage
@@ -294,7 +301,7 @@ Mount.prototype.autoindex = function (p, req, res) {
     res.setHeader('content-type', 'text/html')
     res.setHeader('content-length', html.length)
     res.end(html)
-  }.bind(this));
+  }.bind(this))
 }
 
 
@@ -330,7 +337,7 @@ Mount.prototype.cachedFile = function (p, stat, etag, req, res) {
       res.setHeader('content-length', content.length)
       res.end(content)
     }
-  }.bind(this));
+  }.bind(this))
 }
 
 Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
@@ -416,7 +423,7 @@ Mount.prototype._loadIndex = function (p, cb) {
       nameLen = Math.max(nameLen, showName.length)
       sizeLen = Math.max(sizeLen, ('' + d.size).length)
       return [ '<a href="' + name + '">' + showName + '</a>',
-               d.mtime, d.size, showName ];
+               d.mtime, d.size, showName ]
     }).sort(function (a, b) {
       return a[2] === '-' && b[2] !== '-' ? -1 // dirs first
            : a[2] !== '-' && b[2] === '-' ? 1
@@ -433,7 +440,7 @@ Mount.prototype._loadIndex = function (p, cb) {
 
     str += '</pre><hr></body></html>'
     cb(null, new Buffer(str))
-  });
+  })
 }
 
 Mount.prototype._loadReaddir = function (p, cb) {
