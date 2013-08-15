@@ -43,6 +43,18 @@ http.createServer(function(req, res) {
 }).listen(1339)
 ```
 
+Within an express app, as a drop-in replacement for `express.static()`:
+```javascript
+var app = express();
+app.use(st({
+  path: __dirname + '/static',
+  url: '/',
+  index: 'index.html',
+  passthrough: true
+}))
+
+app.listen(1340)
+```
 
 Serve the files in static under the / url, but only if not some doing
 other thing:
@@ -55,7 +67,7 @@ http.createServer(function(req, res) {
   } else {
     mount(req, res)
   }
-}).listen(1340)
+}).listen(1341)
 ```
 
 Serve the files in static under the / url, but don't serve a 404 if
@@ -67,7 +79,7 @@ http.createServer(function(req, res) {
   mount(req, res, function() {
     res.end('this is not a static file');
   });
-}).listen(1341);
+}).listen(1342);
 ```
 
 
@@ -142,13 +154,6 @@ http.createServer(function (req, res) {
   if (mount(req, res)) return // serving a static file
   myCustomLogic(req, res)
 }).listen(PORT)
-
-// with express
-app.use(mount)
-// or
-app.route('/static/:fooblz', function (req, res, next) {
-  mount(req, res, next) // will call next() if it doesn't do anything
-})
 ```
 
 On the command line:
