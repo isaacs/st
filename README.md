@@ -46,6 +46,7 @@ http.createServer(function(req, res) {
 Within an express app, as a drop-in replacement for `express.static()`:
 ```javascript
 var app = express();
+
 app.use(st({
   path: __dirname + '/static',
   url: '/',
