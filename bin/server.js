@@ -123,9 +123,7 @@ var opt = {
 }
 
 if (cache === false) {
-  Object.keys(opt.cache).forEach(function (k) {
-    opt.cache[k].max = 0
-  })
+  opt.cache = false
 } else {
   if (age) {
     Object.keys(opt.cache).forEach(function (k) {
