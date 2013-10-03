@@ -92,6 +92,8 @@ function Mount (opt) {
   this._index = opt.index === false ? false
               : typeof opt.index === 'string' ? opt.index
               : true
+  this._cacheControl = this.opt.cache === false ? 'public,max-age=0'
+                     : 'public'
   this.fdman = FD()
 
   // cache basically everything
@@ -240,7 +242,7 @@ Mount.prototype.serve = function (req, res, next) {
         return end()
       }
 
-      res.setHeader('cache-control', 'public')
+      res.setHeader('cache-control', this._cacheControl)
       res.setHeader('last-modified', stat.mtime.toUTCString())
       res.setHeader('etag', etag)
 
