@@ -114,3 +114,11 @@ test('multiball!', function (t) {
       t.end()
   }
 })
+
+test('space in filename', function (t) {
+  req('/test/test/fixtures/space in filename.txt', function (er, res, body) {
+    t.equal(res.statusCode, 200)
+    t.ok(body)
+    t.end()
+  })
+})
