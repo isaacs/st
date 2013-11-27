@@ -343,7 +343,8 @@ Mount.prototype.cachedFile = function (p, stat, etag, req, res) {
 }
 
 Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
-  var streamOpt = { fd: fd, start: 0, end: stat.size }
+  var range = getRange(stat, req)
+  var streamOpt = { fd: fd, start: range.start, end: range.end }
   var stream = fs.createReadStream(p, streamOpt)
   stream.destroy = function () {}
 
@@ -362,15 +363,27 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
 
   var gz = getGz(p, req)
 
-  res.statusCode = 200
-  stream.pipe(gzstr)
+  if (range.status > 200) {
+    gz = false
+    res.statusCode = range.status
+  } else {
+    res.statusCode = 200
+    stream.pipe(gzstr)
+  }
 
   if (gz) {
     // we don't know how long it'll be, since it will be compressed.
     res.setHeader('content-encoding', 'gzip')
     gzstr.pipe(res)
   } else {
-    if (!res.filter) res.setHeader('content-length', stat.size)
+    if (!res.filter) {
+      if (range.status > 200) {
+        res.setHeader('content-range', 'bytes '+range.start+'-'+range.end+'/'+stat.size)
+        res.setHeader('content-length', range.end - range.start + 1)
+      } else {
+        res.setHeader('content-length', stat.size)
+      }
+    }
     stream.pipe(res)
   }
 
@@ -506,4 +519,23 @@ function getGz (p,req) {
     gz = neg.preferredEncoding(['gzip', 'identity']) === 'gzip'
   }
   return gz
+}
+
+function getRange (stat,req) {
+  // detect range request
+  var start = 0, end = stat.size, status = 200
+  if (typeof req.headers.range !== 'undefined') {
+    var ranges = req.headers.range.replace('bytes=', '').split('-')
+    start = +ranges[0]
+    end = +ranges[1]
+    status = 206
+    if (start > end) {
+      status = 416
+      start = 0
+      end = 0
+    } else if (stat.size < end - start + 1) {
+      end = stat.size - 1
+    }
+  }
+  return { start: start, end: end, status: status }
 }

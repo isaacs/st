@@ -122,3 +122,21 @@ test('space in filename', function (t) {
     t.end()
   })
 })
+
+test('206 request', function (t) {
+  req('/test/st.js', {'range':'bytes=0-10', 'accept-encoding':'gzip'}, function (er, res, body) {
+    t.equal(res.statusCode, 206)
+    t.notEqual(res.headers['content-encoding'], 'gzip')
+    t.ok(body)
+    t.end()
+  })
+})
+
+test('invalid range', function (t) {
+  req('/test/st.js', {'range':'bytes=10-0'}, function (er, res, body) {
+    t.equal(res.statusCode, 416)
+    t.notEqual(res.headers['content-encoding'], 'gzip')
+    t.ok(body)
+    t.end()
+  })
+})
