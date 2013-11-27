@@ -525,7 +525,9 @@ function getRange (stat,req) {
   // detect range request
   var start = 0, end = stat.size, status = 200
   if (typeof req.headers.range !== 'undefined') {
-    var ranges = req.headers.range.replace('bytes=', '').split('-')
+    // not supported split byte-spec
+    var ranges = req.headers.range.replace('bytes=', '').split(',').shift()
+    ranges = ranges.split('-')
     status = 206
     start = +ranges[0]
     end = +ranges[1]
