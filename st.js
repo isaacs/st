@@ -526,9 +526,16 @@ function getRange (stat,req) {
   var start = 0, end = stat.size, status = 200
   if (typeof req.headers.range !== 'undefined') {
     var ranges = req.headers.range.replace('bytes=', '').split('-')
+    status = 206
     start = +ranges[0]
     end = +ranges[1]
-    status = 206
+    if (0 === ranges[0].length) { // bytes=-500
+      start = stat.size - end
+      end = stat.size - 1
+    }
+    if (0 === ranges[1].length) { // bytes=500-
+      end = stat.size - 1
+    }
     if (start > end) {
       status = 416
       start = 0

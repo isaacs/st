@@ -124,8 +124,9 @@ test('space in filename', function (t) {
 })
 
 test('206 request', function (t) {
-  fs.stat('../st.js', function(err, stats) {
-    req('/test/st.js', {'range':'bytes=0-10', 'accept-encoding':'gzip'}, function (er, res, body) {
+  fs.stat('./fixtures/stream.txt', function(err, stats) {
+    req('/test/test/fixtures/stream.txt', {'range':'bytes=0-10', 'accept-encoding':'gzip'}, function (er, res, body) {
+      t.equal(body.toString(), 'Lorem ipsum')
       t.equal(body.length, 11)
       t.equal(res.statusCode, 206)
       t.equal(res.headers['content-length'], '11')
@@ -137,11 +138,42 @@ test('206 request', function (t) {
   })
 })
 
+test('last bytes', function (t) {
+  fs.stat('./fixtures/stream.txt', function(err, stats) {
+    req('/test/test/fixtures/stream.txt', {'range':'bytes=-13', 'accept-encoding':'gzip'}, function (er, res, body) {
+      t.equal(body.length, 13)
+      t.equal(body.toString(), 'magna aliqua.')
+      t.equal(res.statusCode, 206)
+      t.equal(res.headers['content-length'], '13')
+      t.equal(res.headers['content-range'], 'bytes '+ (stats.size - 13) + '-' + (stats.size - 1) + '/' + stats.size)
+      t.notEqual(res.headers['content-encoding'], 'gzip')
+      t.ok(body)
+      t.end()
+    })
+  })
+})
+
+test('from bytes', function (t) {
+  fs.stat('./fixtures/stream.txt', function(err, stats) {
+    req('/test/test/fixtures/stream.txt', {'range':'bytes=111-', 'accept-encoding':'gzip'}, function (er, res, body) {
+      t.equal(body.length, 13)
+      t.equal(body.toString(), 'magna aliqua.')
+      t.equal(res.statusCode, 206)
+      t.equal(res.headers['content-length'], '13')
+      t.equal(res.headers['content-range'], 'bytes '+ (stats.size - 13) + '-' + (stats.size - 1) + '/' + stats.size)
+      t.notEqual(res.headers['content-encoding'], 'gzip')
+      t.ok(body)
+      t.end()
+    })
+  })
+})
+
 test('invalid range', function (t) {
-  req('/test/st.js', {'range':'bytes=10-0'}, function (er, res, body) {
+  req('/test/test/fixtures/stream.txt', {'range':'bytes=10-0'}, function (er, res, body) {
     t.equal(res.statusCode, 416)
     t.notEqual(res.headers['content-encoding'], 'gzip')
     t.ok(body)
     t.end()
   })
 })
+
