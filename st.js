@@ -108,7 +108,7 @@ function Mount (opt) {
 // lru-cache doesn't like when max=0, so we just pretend
 // everything is really big.  kind of a kludge, but easiest way
 // to get it done
-var none = { max: 1, maxSize: 0, length: function() {
+var none = { max: 1, maxAge: null, length: function() {
   return Infinity
 }}
 var noCaching = {
