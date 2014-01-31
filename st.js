@@ -227,6 +227,11 @@ Mount.prototype.serve = function (req, res, next) {
         return this.error(er, res)
       }
 
+      if (stat.isDirectory() && next && this.opt.passthrough === true && this._index === false) {
+        end()
+        return next()
+      }
+
       var ims = req.headers['if-modified-since']
       if (ims) ims = new Date(ims).getTime()
       if (ims && ims >= stat.mtime.getTime()) {
@@ -248,9 +253,6 @@ Mount.prototype.serve = function (req, res, next) {
 
       if (stat.isDirectory()) {
         end()
-        if (next && this.opt.passthrough === true && this._index === false) {
-          return next()
-        }
         return this.index(p, req, res)
       }
 
