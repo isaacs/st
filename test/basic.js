@@ -129,3 +129,12 @@ test('malformed URL', function (t) {
     t.end()
   })
 })
+
+test('shenanigans', function(t) {
+  req('/%2e%2E/%2e%2E/%2e%2E/%2e%2E/%2e%2E/%2e%2E/etc/passwd', function(er, res, body) {
+    if (er)
+      throw er
+    t.equal(res.statusCode, 404)
+    t.end()
+  })
+})
