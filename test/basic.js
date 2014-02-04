@@ -122,3 +122,10 @@ test('space in filename', function (t) {
     t.end()
   })
 })
+
+test('malformed URL', function (t) {
+  req('/test%2E%git', function (er, res, body) {
+    t.equal(res.statusCode, 404)
+    t.end()
+  })
+})

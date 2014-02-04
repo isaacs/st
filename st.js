@@ -159,7 +159,13 @@ Mount.prototype.getPath = function (u) {
   u = path.normalize(url.parse(u).pathname.replace(/^[\/\\]?/, '/')).replace(/\\/g, '/')
   if (u.indexOf(this.url) !== 0) return false
 
-  u = decodeURIComponent(u)
+  try {
+    u = decodeURIComponent(u)
+  }
+  catch (e) {
+    // if decodeURIComponent failed, we weren't given a valid URL to begin with.
+    return false
+  }
 
   // /a/b/c mounted on /path/to/z/d/x
   // /a/b/c/d --> /path/to/z/d/x/d
