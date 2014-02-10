@@ -161,8 +161,8 @@ Mount.prototype.getPath = function (u) {
   p = p.replace(/%2e/ig, '.')
   p = p.replace(/%2f/ig, '/')
   p = p.replace(/%5c/ig, '\\')
-  p = p.replace(/^[\/\\]?/, '/')
-  p = p.replace(/[\/\\]\.\.[\/\\]/, '/')
+  p = p.replace(/^[\/\\]?/g, '/')
+  p = p.replace(/[\/\\]\.\.[\/\\]/g, '/')
 
   u = path.normalize(p).replace(/\\/g, '/')
   if (u.indexOf(this.url) !== 0) return false
