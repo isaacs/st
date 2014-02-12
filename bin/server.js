@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 var st = require('../st.js')
 var http = require('http')
+var open = require('open')
 var port = +(process.env.PORT || 1337)
 var dir = ''
 var cacheSize = 0
@@ -8,6 +9,7 @@ var dot = false
 var index = true
 var cache = true
 var age = null
+var o = null
 
 for (var i = 2; i < process.argv.length; i++) {
   switch (process.argv[i]) {
@@ -71,6 +73,11 @@ for (var i = 2; i < process.argv.length; i++) {
       }
       age = +age
       break
+
+    case '-o':
+    case '--open':
+      o = process.argv[++i]
+      break
   }
 }
 
@@ -103,6 +110,8 @@ function help () {
 ,'-nc --no-cache        Turn off all caching.'
 ,''
 ,'-a --age AGE          Max age (in ms) of cache entries.'
+,''
+,'-o --open OPEN        URL to open on server start.'
 ].join('\n'))
 }
 
@@ -142,3 +151,7 @@ http.createServer(function (q, s) {
 }).listen(port)
 
 console.log('listening at http://127.0.0.1:' + port)
+
+if (o) {
+  open(o)
+}
