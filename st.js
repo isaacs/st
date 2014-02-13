@@ -256,19 +256,23 @@ Mount.prototype.serve = function (req, res, next) {
         return end()
       }
 
-      res.setHeader('cache-control', 'public')
-      res.setHeader('last-modified', stat.mtime.toUTCString())
-      res.setHeader('etag', etag)
+      var isDirectory = stat.isDirectory()
 
-      if (stat.isDirectory()) {
+      if (isDirectory) {
         end()
         if (next && this.opt.passthrough === true && this._index === false) {
           return next()
         }
-        return this.index(p, req, res)
       }
 
-      return this.file(p, fd, stat, etag, req, res, end)
+      // only set headers once we're sure we'll be serving this request
+      res.setHeader('cache-control', 'public')
+      res.setHeader('last-modified', stat.mtime.toUTCString())
+      res.setHeader('etag', etag)
+
+      return isDirectory
+        ? this.index(p, req, res)
+        : this.file(p, fd, stat, etag, req, res, end)
     }.bind(this))
   }.bind(this))
 

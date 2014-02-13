@@ -54,3 +54,29 @@ test('return error if passthrough is not set', function (t) {
     t.end()
   })
 })
+
+test('does not set headers if passthrough is set', function (t){
+  var req = { method: 'GET', url: '/doesnotexist.txt', headers: {} }
+  var res = {
+    error: function () {
+      t.end()
+    },
+    _headers: [],
+    setHeader: function (header) {
+      res._headers.push(header)
+    },
+    end: function () {}
+  }
+  t.plan(2)
+  mount(req, res, function () {
+
+    t.notOk(res._headers.length, 'headers are not set on a non-existant file')
+    req.url='/';
+
+    mount(req, res, function () {
+      console.error(res._headers)
+      t.notOk(res._headers.length, 'headers are not set with no index')
+      t.end()
+    })
+  })
+})
