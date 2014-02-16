@@ -199,9 +199,10 @@ Mount.prototype.serve = function (req, res, next) {
   }
 
   // querystrings are of no concern to us
-  req.url = url.parse(req.url).pathname
+  req.sturl = url.parse(req.url).pathname
 
-  var p = this.getPath(req.url)
+  var p = this.getPath(req.sturl)
+
   if (!p) {
     if (typeof next === 'function') next()
     return false
@@ -299,18 +300,18 @@ Mount.prototype.index = function (p, req, res) {
     return this.autoindex(p, req, res)
   }
   if (typeof this._index === 'string') {
-    if (!/\/$/.test(req.url)) req.url += '/'
-    req.url += this._index
+    if (!/\/$/.test(req.sturl)) req.sturl += '/'
+    req.sturl += this._index
     return this.serve(req, res)
   }
   return this.error(404, res)
 }
 
 Mount.prototype.autoindex = function (p, req, res) {
-  if (!/\/$/.exec(req.url)) {
+  if (!/\/$/.exec(req.sturl)) {
     res.statusCode = 301
-    res.setHeader('location', req.url + '/')
-    res.end('Moved: ' + req.url + '/')
+    res.setHeader('location', req.sturl + '/')
+    res.end('Moved: ' + req.sturl + '/')
     return
   }
 

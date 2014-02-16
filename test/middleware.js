@@ -13,11 +13,11 @@ var opts = util._extend({
 var mount = st(opts)
 
 test('call next() if asset not found', function (t) {
-  var req = { url: '/does-not-exist' }
+  var req = { url: '/does-not-exist?a=b' }
   var res = {}
   t.plan(1)
   function next() {
-    t.ok(true)
+    t.equal(req.url, '/does-not-exist?a=b')
   }
   mount(req, req, next)
 })
