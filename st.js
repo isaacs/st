@@ -158,11 +158,23 @@ Mount.prototype.getCacheOptions = function (opt) {
 Mount.prototype.getPath = function (u) {
   var p = url.parse(u).pathname
 
+  // Encoded dots are dots
   p = p.replace(/%2e/ig, '.')
-  p = p.replace(/%2f/ig, '/')
-  p = p.replace(/%5c/ig, '\\')
-  p = p.replace(/^[\/\\]?/g, '/')
-  p = p.replace(/[\/\\]\.\.[\/\\]/g, '/')
+
+  // encoded slashes are /
+  p = p.replace(/%2f|%5c/ig, '/')
+
+  // back slashes are slashes
+  p = p.replace(/[\/\\]/g, '/')
+
+  // Make sure it starts with a slash
+  p = p.replace(/^\//, '/')
+
+  if (p.match(/[\/\\]\.\.[\/\\]/)) {
+    // traversal urls not ever even slightly allowed. clearly shenanigans
+    // send a 403 on that noise, do not pass go, do not collect $200
+    return 403
+  }
 
   u = path.normalize(p).replace(/\\/g, '/')
   if (u.indexOf(this.url) !== 0) return false
@@ -203,13 +215,17 @@ Mount.prototype.serve = function (req, res, next) {
 
   var p = this.getPath(req.sturl)
 
+  // Falsey here means we got some kind of invalid path.
+  // Probably urlencoding we couldn't understand, or some
+  // other "not compatible with st, but maybe ok" thing.
   if (!p) {
     if (typeof next === 'function') next()
     return false
   }
 
   // don't allow dot-urls by default, unless explicitly allowed.
-  if (!this.opt.dot && p.match(/(^|\/)\./)) {
+  // If we got a 403, then it's explicitly forbidden.
+  if (p === 403 || !this.opt.dot && p.match(/(^|\/)\./)) {
     res.statusCode = 403
     res.end('Forbidden')
     return true
