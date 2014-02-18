@@ -455,7 +455,13 @@ Mount.prototype._loadIndex = function (p, cb) {
 
     Object.keys(data).map(function (f) {
       var d = data[f]
-      var name = f.replace(/"/g, '&quot;')
+
+      var name = f
+          .replace(/"/g, '&quot;')
+          .replace(/>/g, '&lt;')
+          .replace(/</g, '&gt;')
+          .replace(/'/g, '&#39;')
+
       if (d.size === '-') name += '/'
       var showName = name.replace(/^(.{40}).{3,}$/, '$1..>')
       nameLen = Math.max(nameLen, showName.length)
