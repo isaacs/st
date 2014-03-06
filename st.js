@@ -92,6 +92,8 @@ function Mount (opt) {
   this._index = opt.index === false ? false
               : typeof opt.index === 'string' ? opt.index
               : true
+  this._cacheControl = opt.cache === false ? 'public'
+                     : 'public, max-age=' + opt.cache.content.maxAge / 1000
   this.fdman = FD()
 
   // cache basically everything
@@ -284,7 +286,7 @@ Mount.prototype.serve = function (req, res, next) {
       }
 
       // only set headers once we're sure we'll be serving this request
-      res.setHeader('cache-control', 'public')
+      res.setHeader('cache-control', this._cacheControl)
       res.setHeader('last-modified', stat.mtime.toUTCString())
       res.setHeader('etag', etag)
 
