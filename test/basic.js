@@ -113,6 +113,10 @@ test('multiball!', function (t) {
     if (er)
       throw er
     t.equal(res.statusCode, 200)
+    var cc = 'public, max-age=600'
+    if (opts.cache === false)
+      cc = 'public'
+    t.equal(res.headers['cache-control'], cc)
 
     if (--n === 0)
       t.end()

@@ -103,6 +103,9 @@ function Mount (opt) {
     readdir: AC(c.readdir),
     content: AC(c.content)
   }
+
+  this._cacheControl = opt.cache === false ? 'public'
+                     : 'public, max-age=' + c.content.maxAge / 1000
 }
 
 // lru-cache doesn't like when max=0, so we just pretend
@@ -284,7 +287,7 @@ Mount.prototype.serve = function (req, res, next) {
       }
 
       // only set headers once we're sure we'll be serving this request
-      res.setHeader('cache-control', 'public')
+      res.setHeader('cache-control', this._cacheControl)
       res.setHeader('last-modified', stat.mtime.toUTCString())
       res.setHeader('etag', etag)
 
