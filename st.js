@@ -439,12 +439,18 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
 Mount.prototype._loadIndex = function (p, cb) {
   // truncate off the first bits
   var url = p.substr(this.path.length).replace(/\\/g, '/')
+  var t = url
+      .replace(/"/g, '&quot;')
+      .replace(/>/g, '&lt;')
+      .replace(/</g, '&gt;')
+      .replace(/'/g, '&#39;')
+
   var str =
     '<!doctype html>' +
     '<html>' +
-    '<head><title>Index of ' + url + '</title></head>' +
+    '<head><title>Index of ' + t + '</title></head>' +
     '<body>' +
-    '<h1>Index of ' + url + '</h1>' +
+    '<h1>Index of ' + t + '</h1>' +
     '<hr><pre><a href="../">../</a>\n'
 
   this.cache.readdir.get(p, function (er, data) {
