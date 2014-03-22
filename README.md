@@ -135,6 +135,9 @@ var mount = st({
 
   passthrough: true, // calls next/returns instead of returning a 404 error
   passthrough: false, // returns a 404 when a file or an index is not found
+
+  gzip: true, // default: compresses the response with gzip compression
+  gzip: false, // does not compress the response, even if client accepts gzip
 })
 
 // with bare node.js
@@ -225,6 +228,10 @@ this utility will use a bit more memory than the cache.content.max and
 cache.index.max bytes would seem to allow.  This will be less than
 double, and usually insignificant for normal web assets, but is
 important to consider if memory is at a premium.
+
+Gzip compression can be disabled by setting `gzip: false` on the options passed 
+into `st()`. This is useful if your application already handles gzipping
+responses by other means.
 
 ## Filtering Output
 
