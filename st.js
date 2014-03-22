@@ -362,7 +362,10 @@ Mount.prototype.file = function (p, fd, stat, etag, req, res, end) {
 
 Mount.prototype.cachedFile = function (p, stat, etag, req, res) {
   var key = stat.size + ':' + etag
-  var gz = getGz(p, req)
+
+  if (this.opt.gzip !== false) {
+    var gz = getGz(p, req)
+  }
 
   this.cache.content.get(key, function (er, content) {
     if (er) return this.error(er, res)
@@ -394,12 +397,14 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
   if (res.filter) {
     stream = stream.pipe(res.filter)
   }
-  var gzstr = zlib.Gzip()
 
-  var gz = getGz(p, req)
+  if (this.opt.gzip !== false) {
+    var gzstr = zlib.Gzip()
+    var gz = getGz(p, req)
+    stream.pipe(gzstr)
+  }
 
   res.statusCode = 200
-  stream.pipe(gzstr)
 
   if (gz) {
     // we don't know how long it'll be, since it will be compressed.
@@ -418,18 +423,21 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
     // collect it, and put it in the cache
     var key = fd + ':' + stat.size + ':' + etag
     var bufs = []
-    var gzbufs = []
     stream.on('data', function (c) {
       bufs.push(c)
     })
-    gzstr.on('data', function (c) {
-      gzbufs.push(c)
-    })
-    gzstr.on('end', function () {
-      var content = Buffer.concat(bufs)
-      content.gz = Buffer.concat(gzbufs)
-      this.cache.content.set(key, content)
-    }.bind(this))
+
+    if (gzstr) {
+      var gzbufs = []
+      gzstr.on('data', function (c) {
+        gzbufs.push(c)
+      })
+      gzstr.on('end', function () {
+        var content = Buffer.concat(bufs)
+        content.gz = Buffer.concat(gzbufs)
+        this.cache.content.set(key, content)
+      }.bind(this))
+    }
   }
 }
 

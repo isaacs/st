@@ -10,7 +10,6 @@ var mount = basic.mount
 
 // additional tests to ensure that it's actually not caching.
 var test = require('tap').test
-var port = process.env.PORT || 1337
 
 test('all caches should be empty', function(t) {
   t.same(mount._this.cache.fd._cache.dump(), {})

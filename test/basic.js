@@ -16,9 +16,12 @@ var opts = util._extend({
   url: '/test'
 }, global.options || {})
 
+var stExpect = fs.readFileSync(require.resolve('../st.js')).toString()
+
 var mount = st(opts)
 exports.mount = mount
 exports.req = req
+exports.stExpect = stExpect
 
 function req (url, headers, cb) {
   if (typeof headers === 'function') cb = headers, headers = {}
@@ -45,7 +48,6 @@ tap.tearDown(function() {
 
 
 var stEtag
-var stExpect = fs.readFileSync(require.resolve('../st.js')).toString()
 test('simple request', function (t) {
   req('/test/st.js', function (er, res, body) {
     t.equal(res.statusCode, 200)
@@ -65,18 +67,20 @@ test('304 request', function (t) {
   })
 })
 
-test('gzip', function (t) {
-  req('/test/st.js', {'accept-encoding':'gzip'},
-      function (er, res, body) {
-    t.equal(res.statusCode, 200)
-    t.equal(res.headers['content-encoding'], 'gzip')
-    zlib.gunzip(body, function (er, body) {
-      if (er) throw er;
-      t.equal(body.toString(), stExpect)
-      t.end()
+if (opts.gzip !== false) {
+  test('gzip', function (t) {
+    req('/test/st.js', {'accept-encoding':'gzip'},
+        function (er, res, body) {
+      t.equal(res.statusCode, 200)
+      t.equal(res.headers['content-encoding'], 'gzip')
+      zlib.gunzip(body, function (er, body) {
+        if (er) throw er;
+        t.equal(body.toString(), stExpect)
+        t.end()
+      })
     })
   })
-})
+}
 
 test('multiball!', function (t) {
   var n = 6
