@@ -441,8 +441,8 @@ Mount.prototype._loadIndex = function (p, cb) {
   var url = p.substr(this.path.length).replace(/\\/g, '/')
   var t = url
       .replace(/"/g, '&quot;')
-      .replace(/>/g, '&lt;')
-      .replace(/</g, '&gt;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
       .replace(/'/g, '&#39;')
 
   var str =
@@ -464,8 +464,8 @@ Mount.prototype._loadIndex = function (p, cb) {
 
       var name = f
           .replace(/"/g, '&quot;')
-          .replace(/>/g, '&lt;')
-          .replace(/</g, '&gt;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
           .replace(/'/g, '&#39;')
 
       if (d.size === '-') name += '/'
