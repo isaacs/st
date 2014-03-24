@@ -92,6 +92,8 @@ function Mount (opt) {
   this._index = opt.index === false ? false
               : typeof opt.index === 'string' ? opt.index
               : true
+  this._cacheControl = opt.cache === false ? 'public'
+                     : 'public, max-age=' + opt.cache.content.maxAge / 1000
   this.fdman = FD()
 
   // cache basically everything
