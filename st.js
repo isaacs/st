@@ -481,9 +481,10 @@ Mount.prototype._loadIndex = function (p, cb) {
 
       if (d.size === '-') name += '/'
       var showName = name.replace(/^(.{40}).{3,}$/, '$1..>')
+      var linkName = encodeURIComponent(name)
       nameLen = Math.max(nameLen, showName.length)
       sizeLen = Math.max(sizeLen, ('' + d.size).length)
-      return [ '<a href="' + name + '">' + showName + '</a>',
+      return [ '<a href="' + linkName + '">' + showName + '</a>',
                d.mtime, d.size, showName ]
     }).sort(function (a, b) {
       return a[2] === '-' && b[2] !== '-' ? -1 // dirs first
