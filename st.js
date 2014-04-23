@@ -262,6 +262,14 @@ Mount.prototype.serve = function (req, res, next) {
         return this.error(er, res)
       }
 
+      var isDirectory = stat.isDirectory()
+
+      if (isDirectory && next && this.opt.passthrough === true &&
+          this._index === false) {
+        end();
+        return next()
+      }
+
       var ims = req.headers['if-modified-since']
       if (ims) ims = new Date(ims).getTime()
       if (ims && ims >= stat.mtime.getTime()) {
@@ -277,14 +285,7 @@ Mount.prototype.serve = function (req, res, next) {
         return end()
       }
 
-      var isDirectory = stat.isDirectory()
-
-      if (isDirectory) {
-        end()
-        if (next && this.opt.passthrough === true && this._index === false) {
-          return next()
-        }
-      }
+      if (isDirectory) end()
 
       // only set headers once we're sure we'll be serving this request
       res.setHeader('cache-control', this._cacheControl)
