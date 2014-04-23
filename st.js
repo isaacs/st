@@ -104,7 +104,7 @@ function Mount (opt) {
     content: AC(c.content)
   }
 
-  this._cacheControl = opt.cache === false ? 'public'
+  this._cacheControl = opt.cache === false ? 'no-cache'
                      : 'public, max-age=' + c.content.maxAge / 1000
 }
 

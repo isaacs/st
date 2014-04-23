@@ -115,7 +115,7 @@ test('multiball!', function (t) {
     t.equal(res.statusCode, 200)
     var cc = 'public, max-age=600'
     if (opts.cache === false)
-      cc = 'public'
+      cc = 'no-cache'
     t.equal(res.headers['cache-control'], cc)
 
     if (--n === 0)
