@@ -115,8 +115,13 @@ test('multiball!', function (t) {
     t.equal(res.statusCode, 200)
     var cc = 'public, max-age=600'
     if (opts.cache === false)
-      cc = 'no-cache'
-    t.equal(res.headers['cache-control'], cc)
+      cc = 'public'
+
+    if (opts.cache && opts.cache.content && opts.cache.content.maxAge === false) {
+      t.notOk(res.headers['cache-control'])
+    } else {
+      t.equal(res.headers['cache-control'], cc)
+    }
 
     if (--n === 0)
       t.end()
