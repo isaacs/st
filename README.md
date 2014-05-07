@@ -112,6 +112,7 @@ var mount = st({
     content: {
       max: 1024*1024*64, // how much memory to use on caching contents
       maxAge: 1000 * 60 * 10, // how long to cache contents for
+                              // if `false` does not set cache control headers
     },
 
     index: { // irrelevant if not using index:true

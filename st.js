@@ -104,6 +104,7 @@ function Mount (opt) {
     content: AC(c.content)
   }
 
+  this._cacheEnabled = c.content.maxAge === false ? false : true
   this._cacheControl = opt.cache === false ? 'public'
                      : 'public, max-age=' + c.content.maxAge / 1000
 }
@@ -287,7 +288,7 @@ Mount.prototype.serve = function (req, res, next) {
       }
 
       // only set headers once we're sure we'll be serving this request
-      res.setHeader('cache-control', this._cacheControl)
+      this._cacheEnabled && res.setHeader('cache-control', this._cacheControl)
       res.setHeader('last-modified', stat.mtime.toUTCString())
       res.setHeader('etag', etag)
 
