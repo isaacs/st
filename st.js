@@ -108,9 +108,20 @@ function Mount (opt) {
   this._cacheControl = opt.cache === false ? 'no-cache'
 =======
   this._cacheEnabled = c.content.maxAge === false ? false : true
+<<<<<<< HEAD
   this._cacheControl = opt.cache === false ? 'public'
 >>>>>>> add an option to disable cache control headers
                      : 'public, max-age=' + c.content.maxAge / 1000
+=======
+  this._cacheControl =
+    c.content.maxAge === false
+      ? undefined
+      : typeof c.content.cacheControl == 'string'
+        ? c.content.cacheControl
+        : opt.cache === false
+          ? 'public'
+          : 'public, max-age=' + (c.content.maxAge / 1000)
+>>>>>>> more flexibility around cache-control
 }
 
 // lru-cache doesn't like when max=0, so we just pretend
@@ -292,7 +303,8 @@ Mount.prototype.serve = function (req, res, next) {
       }
 
       // only set headers once we're sure we'll be serving this request
-      this._cacheEnabled && res.setHeader('cache-control', this._cacheControl)
+      if (!res.getHeader('cache-control'))
+        res.setHeader('cache-control', this._cacheControl)
       res.setHeader('last-modified', stat.mtime.toUTCString())
       res.setHeader('etag', etag)
 
