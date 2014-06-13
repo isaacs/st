@@ -112,11 +112,17 @@ test('multiball!', function (t) {
   function then2 (er, res, body) {
     if (er)
       throw er
+
     t.equal(res.statusCode, 200)
-    var cc = 'public, max-age=600'
+
     if (opts.cache === false)
-      cc = 'no-cache'
-    t.equal(res.headers['cache-control'], cc)
+      t.equal(res.headers['cache-control'], 'no-cache')
+    else if (opts.cache && opts.cache.content && opts.cache.content.maxAge === false)
+      t.notOk(res.headers['cache-control'])
+    else if (opts.cache && opts.cache.content && opts.cache.content.cacheControl)
+      t.equal(res.headers['cache-control'], opts.cache.content.cacheControl)
+    else
+      t.equal(res.headers['cache-control'], 'public, max-age=600')
 
     if (--n === 0)
       t.end()
