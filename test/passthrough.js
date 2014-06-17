@@ -24,7 +24,7 @@ test('call next() if passthrough is set', function (t) {
   t.plan(2)
   mount(req, res, function () {
     t.ok(true, "next called with nonexistant file");
-    req.url='/';
+    req = { method: 'GET', url: '/', headers: {} }
     mount(req, res, function () {
       t.ok(true, "next called without indexing")
       t.end()
