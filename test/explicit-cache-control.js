@@ -1,6 +1,8 @@
 global.options = {
   cache: {
     content: {
+      // testing an arbitrary string can be passed through to override
+      // the header value, YES the misspellings are intentional
       cacheControl: 'pubic, marx-aged=-100'
     }
   }
