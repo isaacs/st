@@ -17,6 +17,7 @@ var http = require('http')
 var AC = require('async-cache')
 var util = require('util')
 var FD = require('fd')
+var bl = require('bl')
 
 // default caching options
 var defaultCacheOptions = {
@@ -293,7 +294,7 @@ Mount.prototype.serve = function (req, res, next) {
       }
 
       // only set headers once we're sure we'll be serving this request
-      if (!res.getHeader('cache-control'))
+      if (!res.getHeader('cache-control') && this._cacheControl)
         res.setHeader('cache-control', this._cacheControl)
       res.setHeader('last-modified', stat.mtime.toUTCString())
       res.setHeader('etag', etag)
@@ -372,10 +373,7 @@ Mount.prototype.file = function (p, fd, stat, etag, req, res, end) {
 
 Mount.prototype.cachedFile = function (p, stat, etag, req, res) {
   var key = stat.size + ':' + etag
-
-  if (this.opt.gzip !== false) {
-    var gz = getGz(p, req)
-  }
+  var gz = this.opt.gzip !== false && getGz(p, req)
 
   this.cache.content.get(key, function (er, content) {
     if (er) return this.error(er, res)
@@ -395,6 +393,8 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
   var streamOpt = { fd: fd, start: 0, end: stat.size }
   var stream = fs.createReadStream(p, streamOpt)
   stream.destroy = function () {}
+  // gzip only if not explicitly turned off or client doesn't accept it
+  var gz = this.opt.gzip !== false && getGz(p, req)
 
   // too late to effectively handle any errors.
   // just kill the connection if that happens.
@@ -404,22 +404,15 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
     end()
   })
 
-  if (res.filter) {
-    stream = stream.pipe(res.filter)
-  }
-
-  if (this.opt.gzip !== false) {
-    var gzstr = zlib.Gzip()
-    var gz = getGz(p, req)
-    stream.pipe(gzstr)
-  }
+  if (res.filter) stream = stream.pipe(res.filter)
 
   res.statusCode = 200
 
   if (gz) {
     // we don't know how long it'll be, since it will be compressed.
     res.setHeader('content-encoding', 'gzip')
-    gzstr.pipe(res)
+    var gzstr = zlib.Gzip()
+    stream.pipe(gzstr).pipe(res)
   } else {
     if (!res.filter) res.setHeader('content-length', stat.size)
     stream.pipe(res)
@@ -431,22 +424,22 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
 
   if (this.cache.content._cache.max > stat.size) {
     // collect it, and put it in the cache
-    var key = fd + ':' + stat.size + ':' + etag
-    var bufs = []
-    stream.on('data', function (c) {
-      bufs.push(c)
-    })
 
-    if (gzstr) {
-      var gzbufs = []
-      gzstr.on('data', function (c) {
-        gzbufs.push(c)
-      })
-      gzstr.on('end', function () {
-        var content = Buffer.concat(bufs)
-        content.gz = Buffer.concat(gzbufs)
-        this.cache.content.set(key, content)
-      }.bind(this))
+    var collectEnd = function () {
+      var content = bufs.slice()
+      content.gz = gzbufs && gzbufs.slice()
+      this.cache.content.set(key, content)
+    }.bind(this)
+
+    var key = fd + ':' + stat.size + ':' + etag
+    var bufs = bl(!gz && collectEnd) // don't pass callback if gzstr is being used
+    var gzbufs
+
+    stream.pipe(bufs)
+
+    if (gz) {
+      gzbufs = bl(collectEnd)
+      gzstr.pipe(gzbufs)
     }
   }
 }

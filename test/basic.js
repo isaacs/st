@@ -118,7 +118,7 @@ test('multiball!', function (t) {
     if (opts.cache === false)
       t.equal(res.headers['cache-control'], 'no-cache')
     else if (opts.cache && opts.cache.content && opts.cache.content.maxAge === false)
-      t.notOk(res.headers['cache-control'])
+      t.ok(res.headers['cache-control'] === undefined)
     else if (opts.cache && opts.cache.content && opts.cache.content.cacheControl)
       t.equal(res.headers['cache-control'], opts.cache.content.cacheControl)
     else
