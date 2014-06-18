@@ -1,53 +1,18 @@
-var path = require('path')
-var fs = require('fs')
 var zlib = require('zlib')
-var http = require('http')
-var server
-var st = require('../st.js')
-var request = require('request')
-var tap = require('tap')
-var test = tap.test
-var port = process.env.PORT || 1337
-var util = require('util')
+var test = require('tap').test
+var common = require('./common')
 
-var opts = util._extend({
-  autoindex: true,
-  path: path.dirname(__dirname),
-  url: '/test'
-}, global.options || {})
-
-var stExpect = fs.readFileSync(require.resolve('../st.js')).toString()
-
-var mount = st(opts)
-exports.mount = mount
-exports.req = req
-exports.stExpect = stExpect
-
-function req (url, headers, cb) {
-  if (typeof headers === 'function') cb = headers, headers = {}
-  request({ encoding: null,
-            url: 'http://localhost:' + port + url,
-            headers: headers }, cb)
-}
-
-test('setup', function (t) {
-  server = http.createServer(function (req, res) {
-    if (!mount(req, res)) {
-      res.statusCode = 404
-      return res.end('Not a match: ' + req.url)
-    }
-  }).listen(port, function () {
-    t.pass('listening')
-    t.end()
-  })
-})
-
-tap.tearDown(function() {
-  server.close()
-})
-
+var req = common.req
+var stExpect = common.stExpect
+var opts = common.opts
 
 var stEtag
+
+module.exports.mount = common.mount
+module.exports.req = common.req
+module.exports.stExpect = common.stExpect
+
+
 test('simple request', function (t) {
   req('/test/st.js', function (er, res, body) {
     t.equal(res.statusCode, 200)
@@ -59,6 +24,7 @@ test('simple request', function (t) {
   })
 })
 
+
 test('304 request', function (t) {
   req('/test/st.js', {'if-none-match':stEtag}, function (er, res, body) {
     t.equal(res.statusCode, 304)
@@ -66,6 +32,7 @@ test('304 request', function (t) {
     t.end()
   })
 })
+
 
 if (opts.gzip !== false) {
   test('gzip', function (t) {
@@ -82,6 +49,7 @@ if (opts.gzip !== false) {
   })
 }
 
+
 test('multiball!', function (t) {
   var n = 6
   req('/test/st.js', then)
@@ -91,7 +59,7 @@ test('multiball!', function (t) {
   req('/test/favicon.ico', then)
   req('/test/bin/server.js', then)
 
-  function then (er, res, body) {
+  function then (er, res) {
     if (er)
       throw er
     t.equal(res.statusCode, 200)
@@ -109,7 +77,7 @@ test('multiball!', function (t) {
       }, 200)
   }
 
-  function then2 (er, res, body) {
+  function then2 (er, res) {
     if (er)
       throw er
 
@@ -118,7 +86,7 @@ test('multiball!', function (t) {
     if (opts.cache === false)
       t.equal(res.headers['cache-control'], 'no-cache')
     else if (opts.cache && opts.cache.content && opts.cache.content.maxAge === false)
-      t.notOk(res.headers['cache-control'])
+      t.ok(res.headers['cache-control'] === undefined)
     else if (opts.cache && opts.cache.content && opts.cache.content.cacheControl)
       t.equal(res.headers['cache-control'], opts.cache.content.cacheControl)
     else
@@ -129,6 +97,7 @@ test('multiball!', function (t) {
   }
 })
 
+
 test('space in filename', function (t) {
   req('/test/test/fixtures/space in filename.txt', function (er, res, body) {
     t.equal(res.statusCode, 200)
@@ -137,15 +106,17 @@ test('space in filename', function (t) {
   })
 })
 
+
 test('malformed URL', function (t) {
-  req('/test%2E%git', function (er, res, body) {
+  req('/test%2E%git', function (er, res) {
     t.equal(res.statusCode, 404)
     t.end()
   })
 })
 
+
 test('shenanigans', function(t) {
-  req('/%2e%2E/%2e%2E/%2e%2E/%2e%2E/%2e%2E/%2e%2E/etc/passwd', function(er, res, body) {
+  req('/%2e%2E/%2e%2E/%2e%2E/%2e%2E/%2e%2E/%2e%2E/etc/passwd', function(er, res) {
     if (er)
       throw er
     t.equal(res.statusCode, 403)
