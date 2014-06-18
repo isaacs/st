@@ -5,10 +5,10 @@ var fs = require('fs')
 var path = require('path')
 var crypto = require('crypto')
 var rimraf = require('rimraf')
-var basic = require('./basic.js')
-var req = basic.req
-var mount = basic.mount
-var stExpect = basic.stExpect
+var common = require('./common.js')
+var req = common.req
+var mount = common.mount
+var stExpect = common.stExpect
 
 var test = require('tap').test
 var testFileName = 'bigfattestfile'
