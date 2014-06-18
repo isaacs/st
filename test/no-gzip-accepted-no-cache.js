@@ -17,6 +17,7 @@ var testFile = path.join(__dirname, '../', testFileName)
 
 var rndData = crypto.randomBytes(1024 * 128).toString('hex') // significantly larger than highWaterMark
 
+
 test('does not gzip the response', function(t) {
   t.on('end', function () {
     rimraf(testFile, function () {})

@@ -201,7 +201,8 @@ Mount.prototype.getPath = function (u) {
   // /a/b/c/d --> /path/to/z/d/x/d
   u = u.substr(this.url.length)
   if (u.charAt(0) !== '/') u = '/' + u
-  var p = path.join(this.path, u)
+
+  p = path.join(this.path, u)
   return p
 }
 
@@ -378,6 +379,8 @@ Mount.prototype.cachedFile = function (p, stat, etag, req, res) {
   this.cache.content.get(key, function (er, content) {
     if (er) return this.error(er, res)
     res.statusCode = 200
+    if (this.opt.cachedHeader)
+      res.setHeader('x-from-cache', 'true')
     if (gz && content.gz) {
       res.setHeader('content-encoding', 'gzip')
       res.setHeader('content-length', content.gz.length)
@@ -393,8 +396,15 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
   var streamOpt = { fd: fd, start: 0, end: stat.size }
   var stream = fs.createReadStream(p, streamOpt)
   stream.destroy = function () {}
+
   // gzip only if not explicitly turned off or client doesn't accept it
-  var gz = this.opt.gzip !== false && getGz(p, req)
+  var gzOpt = this.opt.gzip !== false
+  var gz = gzOpt && getGz(p, req)
+  var cachable = this.cache.content._cache.max > stat.size
+  var gzstr
+
+  // need a gzipped version for the cache, so do it regardless of what the client wants
+  if (gz || (gzOpt && cachable)) gzstr = zlib.Gzip()
 
   // too late to effectively handle any errors.
   // just kill the connection if that happens.
@@ -411,33 +421,40 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
   if (gz) {
     // we don't know how long it'll be, since it will be compressed.
     res.setHeader('content-encoding', 'gzip')
-    var gzstr = zlib.Gzip()
     stream.pipe(gzstr).pipe(res)
   } else {
     if (!res.filter) res.setHeader('content-length', stat.size)
     stream.pipe(res)
+    if (gzstr)
+      stream.pipe(gzstr) // for cache
   }
 
   stream.on('end', function () {
     process.nextTick(end)
   })
 
-  if (this.cache.content._cache.max > stat.size) {
+  if (cachable) {
     // collect it, and put it in the cache
 
+    var calls = 0
+
+    // called by bl() for both the raw stream and gzipped stream if we're
+    // caching gzipped data
     var collectEnd = function () {
-      var content = bufs.slice()
-      content.gz = gzbufs && gzbufs.slice()
-      this.cache.content.set(key, content)
+      if (++calls == (gzOpt ? 2 : 1)) {
+        var content = bufs.slice()
+        content.gz = gzbufs && gzbufs.slice()
+        this.cache.content.set(key, content)
+      }
     }.bind(this)
 
-    var key = fd + ':' + stat.size + ':' + etag
-    var bufs = bl(!gz && collectEnd) // don't pass callback if gzstr is being used
+    var key = stat.size + ':' + etag
+    var bufs = bl(collectEnd)
     var gzbufs
 
     stream.pipe(bufs)
 
-    if (gz) {
+    if (gzstr) {
       gzbufs = bl(collectEnd)
       gzstr.pipe(gzbufs)
     }
@@ -548,7 +565,7 @@ Mount.prototype._loadStat = function (key, cb) {
   }
 }
 
-Mount.prototype._loadContent = function (key, cb) {
+Mount.prototype._loadContent = function () {
   // this function should never be called.
   // we check if the thing is in the cache, and if not, stream it in
   // manually.  this.cache.content.get() should not ever happen.
