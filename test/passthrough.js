@@ -21,14 +21,18 @@ test('call next() if passthrough is set', function (t) {
     setHeader: function () {},
     end: function () {}
   }
-  t.plan(2)
+  t.plan(3)
   mount(req, res, function () {
     t.ok(true, "next called with nonexistant file");
-    req.url='/';
+    req = { method: 'GET', url: '/', headers: {} }
     mount(req, res, function () {
       t.ok(true, "next called without indexing")
-      t.end()
-    });
+      req = { method: 'GET', url: '/', headers: { 'if-modified-since': Date.now() } }
+      mount(req, res, function () {
+        t.ok(true, "next called without indexing (if-modified-since)")
+        t.end()
+      })
+    })
   })
 })
 
