@@ -359,6 +359,11 @@ Mount.prototype.file = function (p, fd, stat, etag, req, res, end) {
   var key = stat.size + ':' + etag
 
   var mt = mime.lookup(path.extname(p))
+
+  if (mt === 'text/html') {
+    mt += '; charset=UTF-8';
+  }
+
   if (mt !== 'application/octet-stream') {
     res.setHeader('content-type', mt)
   }
