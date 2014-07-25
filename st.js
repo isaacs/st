@@ -348,7 +348,7 @@ Mount.prototype.autoindex = function (p, req, res) {
     if (er) return this.error(er, res)
 
     res.statusCode = 200
-    res.setHeader('content-type', 'text/html')
+    res.setHeader('content-type', 'text/html; charset=UTF-8')
     res.setHeader('content-length', html.length)
     res.end(html)
   }.bind(this))
