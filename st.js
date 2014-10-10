@@ -270,6 +270,18 @@ Mount.prototype.serve = function (req, res, next) {
         return this.error(er, res)
       }
 
+      var isDirectory = stat.isDirectory()
+
+      if (isDirectory) {
+        end() // we won't need this fd for a directory in any case
+        if (next && this.opt.passthrough === true && this._index === false) {
+          // this is done before if-modified-since and if-non-match checks so
+          // cached modified and etag values won't return 304's if we've since
+          // switched to !index. See Issue #51.
+          return next()
+        }
+      }
+
       var ims = req.headers['if-modified-since']
       if (ims) ims = new Date(ims).getTime()
       if (ims && ims >= stat.mtime.getTime()) {
@@ -283,15 +295,6 @@ Mount.prototype.serve = function (req, res, next) {
         res.statusCode = 304
         res.end()
         return end()
-      }
-
-      var isDirectory = stat.isDirectory()
-
-      if (isDirectory) {
-        end()
-        if (next && this.opt.passthrough === true && this._index === false) {
-          return next()
-        }
       }
 
       // only set headers once we're sure we'll be serving this request
