@@ -250,7 +250,9 @@ Mount.prototype.serve = function (req, res, next) {
     // fall through to that.  otherwise, we already returned true,
     // send an error.
     if (er) {
-      if (this.opt.passthrough === true && er.code === 'ENOENT' && next)
+      if (this.opt.passthrough === true &&
+        ( er.code === 'ENOENT' || er.code === 'ENOTDIR' )
+        && next)
         return next()
       return this.error(er, res)
     }
