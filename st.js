@@ -18,12 +18,13 @@ var AC = require('async-cache')
 var util = require('util')
 var FD = require('fd')
 var bl = require('bl')
+var as = require('argument-spec')
 
 // default caching options
 var defaultCacheOptions = {
   fd: {
     max: 1000,
-    maxAge: 1000 * 60 * 60,
+    maxAge: 1000 * 60 * 60
   },
   stat: {
     max: 5000,
@@ -51,6 +52,27 @@ var defaultCacheOptions = {
     maxAge: 1000 * 60 * 10
   }
 }
+
+var optionsSpec =
+    as.some(['',
+      as.every([
+        {path:''},
+        as.optional({
+          cache: as.some([false,
+            as.optional({
+              fd: as.optional({max: 0, maxAge: 0}),
+              stat: as.optional({max: 0, maxAge: 0}),
+              content: as.optional({max: 0, maxAge: 0, cacheControl: ''}),
+              index: as.optional({max: 0, maxAge: 0}),
+              readdir: as.optional({max: 0, maxAge: 0})
+            })]),
+          index: as.some(['', true]),
+          dot: true,
+          passthrough: true,
+          gzip: true
+        })
+      ])
+    ])
 
 function st (opt) {
   var p, u
@@ -83,6 +105,15 @@ function st (opt) {
 }
 
 function Mount (opt) {
+  var errorList = sd.validate('options', optionsSpec, opt)
+  if (typeof opt === 'object' && opt.cache && opt.cache === true) {
+    errorList = errorList.concat('options:cache should not be true')
+  }
+
+  if (errorList.length !== 0) {
+    throw new Error(errorList.join('\n'))
+  }
+
   if (!opt) throw new Error('no options provided')
   if (typeof opt !== 'object') throw new Error('invalid options')
   if (!(this instanceof Mount)) return new Mount(opt)
@@ -151,7 +182,7 @@ Mount.prototype.getCacheOptions = function (opt) {
     stat: set('stat'),
     index: set('index'),
     readdir: set('readdir'),
-    content: set('content'),
+    content: set('content')
   }
 
   c.fd.dispose = this.fdman.close.bind(this.fdman)
