@@ -60,11 +60,11 @@ var optionsSpec =
         as.optional({
           cache: as.some([false,
             as.optional({
-              fd: as.optional({max: 0, maxAge: 0),
+              fd: as.optional({max: 0, maxAge: 0}),
               stat: as.optional({max: 0, maxAge: 0}),
-              content: as.optional({max: 0, maxAge: 0, cacheControl: '', length:function(n){}}}),
-              index: as.optional({max: 0, maxAge: 0, length:function(n){}}}),
-              readdir: as.optional({max: 0, maxAge: 0, length:function(n){}}})
+              content: as.optional({max: 0, maxAge: 0, cacheControl: '', length:function(n){}}),
+              index: as.optional({max: 0, maxAge: 0, length:function(n){}}),
+              readdir: as.optional({max: 0, maxAge: 0, length:function(n){}})
             })]),
           index: as.some(['', true]),
           dot: true,
