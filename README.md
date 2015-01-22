@@ -141,6 +141,10 @@ var mount = st({
 
   gzip: true, // default: compresses the response with gzip compression
   gzip: false, // does not compress the response, even if client accepts gzip
+
+  extensions: false, // default: do not assume a default extension
+  extensions: ['.html', '.htm'] // if a file isn't found, fall back to the
+                                // first available of these extensions
 })
 
 // with bare node.js

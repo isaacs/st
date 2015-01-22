@@ -95,6 +95,13 @@ function Mount (opt) {
               : true
   this.fdman = FD()
 
+  this.pathMap = {}
+  this.extensions = []
+    .concat(opt.extensions || [])
+    .map(function(ext) {
+      return ext.charAt(0) === '.' ? ext : '.' + ext
+    })
+
   // cache basically everything
   var c = this.getCacheOptions(opt)
   this.cache = {
@@ -243,73 +250,94 @@ Mount.prototype.serve = function (req, res, next) {
     return true
   }
 
+  var exts = this.extensions
+  var attempt = 0
+
+  // when using fallback extensions, cache the result of
+  // any matched URLs.  otherwise, we'd end up requesting
+  // missing files from the fd cache on each request.
+  if (this.extensions && this.pathMap[p])
+    p = this.pathMap[p]
+
   // now we have a path.  check for the fd.
-  this.cache.fd.get(p, function (er, fd) {
-    // inability to open is some kind of error, probably 404
-    // if we're in passthrough, AND got a next function, we can
-    // fall through to that.  otherwise, we already returned true,
-    // send an error.
-    if (er) {
-      if (this.opt.passthrough === true && er.code === 'ENOENT' && next)
-        return next()
-      return this.error(er, res)
-    }
-
-    // we may be about to use this, so don't let it be closed by cache purge
-    this.fdman.checkout(p, fd)
-    // a safe end() function that can be called multiple times but
-    // only perform a single checkin
-    var end = this.fdman.checkinfn(p, fd)
-
-    this.cache.stat.get(fd+':'+p, function (er, stat) {
+  // if it's not found for some reason, try any extensions
+  // supplied in opt.extensions
+  attemptFile.call(this, p)
+  function attemptFile(file) {
+    this.cache.fd.get(file, function (er, fd) {
+      // inability to open is some kind of error, probably 404
+      // if we're in passthrough, AND got a next function, we can
+      // fall through to that.  otherwise, we already returned true,
+      // send an error.
       if (er) {
-        if (next && this.opt.passthrough === true && this._index === false) {
+        if (attempt < exts.length)
+          return attemptFile.call(this, p + exts[attempt++])
+        if (this.opt.passthrough === true && er.code === 'ENOENT' && next)
           return next()
-        }
-        end()
         return this.error(er, res)
       }
 
-      var isDirectory = stat.isDirectory()
-
-      if (isDirectory) {
-        end() // we won't need this fd for a directory in any case
-        if (next && this.opt.passthrough === true && this._index === false) {
-          // this is done before if-modified-since and if-non-match checks so
-          // cached modified and etag values won't return 304's if we've since
-          // switched to !index. See Issue #51.
-          return next()
-        }
-      }
-
-      var ims = req.headers['if-modified-since']
-      if (ims) ims = new Date(ims).getTime()
-      if (ims && ims >= stat.mtime.getTime()) {
-        res.statusCode = 304
-        res.end()
-        return end()
-      }
-
-      var etag = getEtag(stat)
-      if (req.headers['if-none-match'] === etag) {
-        res.statusCode = 304
-        res.end()
-        return end()
-      }
-
-      // only set headers once we're sure we'll be serving this request
-      if (!res.getHeader('cache-control') && this._cacheControl)
-        res.setHeader('cache-control', this._cacheControl)
-      res.setHeader('last-modified', stat.mtime.toUTCString())
-      res.setHeader('etag', etag)
-
-      return isDirectory
-        ? this.index(p, req, res)
-        : this.file(p, fd, stat, etag, req, res, end)
+      this.pathMap[p] = file
+      this.servePath(file, fd, req, res, next)
     }.bind(this))
-  }.bind(this))
+  }
 
   return true
+}
+
+Mount.prototype.servePath = function (p, fd, req, res, next) {
+  // we may be about to use this, so don't let it be closed by cache purge
+  this.fdman.checkout(p, fd)
+  // a safe end() function that can be called multiple times but
+  // only perform a single checkin
+  var end = this.fdman.checkinfn(p, fd)
+
+  this.cache.stat.get(fd+':'+p, function (er, stat) {
+    if (er) {
+      if (next && this.opt.passthrough === true && this._index === false) {
+        return next()
+      }
+      end()
+      return this.error(er, res)
+    }
+
+    var isDirectory = stat.isDirectory()
+
+    if (isDirectory) {
+      end() // we won't need this fd for a directory in any case
+      if (next && this.opt.passthrough === true && this._index === false) {
+        // this is done before if-modified-since and if-non-match checks so
+        // cached modified and etag values won't return 304's if we've since
+        // switched to !index. See Issue #51.
+        return next()
+      }
+    }
+
+    var ims = req.headers['if-modified-since']
+    if (ims) ims = new Date(ims).getTime()
+    if (ims && ims >= stat.mtime.getTime()) {
+      res.statusCode = 304
+      res.end()
+      return end()
+    }
+
+    var etag = getEtag(stat)
+    if (req.headers['if-none-match'] === etag) {
+      res.statusCode = 304
+      res.end()
+      return end()
+    }
+
+    // only set headers once we're sure we'll be serving this request
+    if (!res.getHeader('cache-control') && this._cacheControl)
+      res.setHeader('cache-control', this._cacheControl)
+    res.setHeader('last-modified', stat.mtime.toUTCString())
+    res.setHeader('etag', etag)
+
+    return isDirectory
+      ? this.index(p, req, res)
+      : this.file(p, fd, stat, etag, req, res, end)
+  }.bind(this))
 }
 
 Mount.prototype.error = function (er, res) {
