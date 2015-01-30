@@ -54,24 +54,35 @@ var defaultCacheOptions = {
 }
 
 var optionsSpec =
-    as.some(['',
-      as.every([
-        {path:''},
-        as.optional({
-          cache: as.some([false,
-            as.optional({
-              fd: as.optional({max: 0, maxAge: 0}),
-              stat: as.optional({max: 0, maxAge: 0}),
-              content: as.optional({max: 0, maxAge: 0, cacheControl: '', length:function(n){}}),
-              index: as.optional({max: 0, maxAge: 0, length:function(n){}}),
-              readdir: as.optional({max: 0, maxAge: 0, length:function(n){}})
-            })]),
-          index: as.some(['', true]),
-          dot: true,
-          passthrough: true,
-          gzip: true
-        })
-      ])
+    as.every([
+      {path:''},
+      {url:''},
+      as.optional({
+        path:'',
+        url:'',
+        index: as.some(['', true]),
+        dot: true,
+        passthrough: true,
+        gzip: true,
+        autoindex:true,
+        cachedHeader:true,
+        cache: as.some([
+          as.isFalse(),
+          as.optional({
+            fd: as.some([
+              as.isFalse(),
+              as.optional({max: 0, maxAge: 0})
+            ]),
+            stat: as.optional({max: 0, maxAge: 0}),
+            content: as.optional({
+              max: 0,
+              maxAge: as.some([0, as.isFalse()]),
+              cacheControl: '',
+              length:function(n){}}),
+            index: as.optional({max: 0, maxAge: 0, length:function(n){}}),
+            readdir: as.optional({max: 0, maxAge: 0, length:function(n){}})
+          })])
+      })
     ])
 
 function st (opt) {
@@ -105,10 +116,7 @@ function st (opt) {
 }
 
 function Mount (opt) {
-  var errorList = sd.validate('options', optionsSpec, opt)
-  if (typeof opt === 'object' && opt.cache && opt.cache === true) {
-    errorList = errorList.concat('options:cache should not be true')
-  }
+  var errorList = as.validate('options', optionsSpec, opt)
 
   if (errorList.length !== 0) {
     throw new Error(errorList.join('\n'))

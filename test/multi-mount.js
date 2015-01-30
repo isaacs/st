@@ -54,7 +54,7 @@ function req (url, headers, cb) {
     if (er)
       return cb(errState = er, res, body)
     if (++reqs === 2) {
-      console.error('done with reqs')
+//      console.error('done with reqs')
       assert.equal(res.statusCode, prev.res.statusCode)
       // compare dates, they should be approximately the same
       assert(Math.abs(new Date(res.headers.date).getTime() -
