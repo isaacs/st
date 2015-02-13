@@ -507,7 +507,7 @@ Mount.prototype._loadIndex = function (p, cb) {
       linkName = linkName.replace(/%2f|%5c/ig, '/')
 
       // back slashes are slashes
-      linkName = linkName.replace(/[\\]/g, '/')
+      linkName = linkName.replace(/\\/g, '/')
 
       nameLen = Math.max(nameLen, showName.length)
       sizeLen = Math.max(sizeLen, ('' + d.size).length)
