@@ -502,13 +502,13 @@ Mount.prototype._loadIndex = function (p, cb) {
       if (d.size === '-') name += '/'
       var showName = name.replace(/^(.{40}).{3,}$/, '$1..>')
       var linkName = encodeURIComponent(name)
-	  
-	  // encoded slashes are /
-	  linkName = linkName.replace(/%2f|%5c/ig, '/')
 
-	  // back slashes are slashes
-	  linkName = linkName.replace(/[\/\\]/g, '/')
-	  
+      // encoded slashes are /
+      linkName = linkName.replace(/%2f|%5c/ig, '/')
+
+      // back slashes are slashes
+      linkName = linkName.replace(/[\\]/g, '/')
+
       nameLen = Math.max(nameLen, showName.length)
       sizeLen = Math.max(sizeLen, ('' + d.size).length)
       return [ '<a href="' + linkName + '">' + showName + '</a>',
