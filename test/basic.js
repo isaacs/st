@@ -28,7 +28,7 @@ test('simple request', function (t) {
 test('304 request', function (t) {
   req('/test/st.js', {'if-none-match':stEtag}, function (er, res, body) {
     t.equal(res.statusCode, 304)
-    t.notOk(body)
+    t.equal(body.length, 0)
     t.end()
   })
 })
