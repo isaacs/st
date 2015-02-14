@@ -41,13 +41,14 @@ function req (url, headers, cb) {
   var errState = null
   var prev = null
 
-  console.error('requesting', url)
   request({ encoding: null,
             url: 'http://localhost:' + port + url,
-            headers: headers }, next)
+            headers: headers,
+            agentOptions: { maxSockets: 50 } }, next)
   request({ encoding: null,
             url: 'http://localhost:' + (port + 1) + url,
-            headers: headers }, next)
+            headers: headers,
+            agentOptions: { maxSockets: 50 } }, next)
 
   function next (er, res, body) {
     if (errState)
@@ -55,7 +56,6 @@ function req (url, headers, cb) {
     if (er)
       return cb(errState = er, res, body)
     if (++reqs === 2) {
-      console.error('done with reqs', url)
       assert.equal(res.statusCode, prev.res.statusCode)
       // compare dates, they should be approximately the same
       assert(Math.abs(new Date(res.headers.date).getTime() -
@@ -115,7 +115,7 @@ test('/test/st.js', function (t) {
 test('/test/st.js 304', function (t) {
   req('/test/st.js', {'if-none-match':stEtag}, function (er, res, body) {
     t.equal(res.statusCode, 304)
-    t.notOk(body)
+    t.equal(body.length, 0)
     t.end()
   })
 })
