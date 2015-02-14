@@ -41,6 +41,7 @@ function req (url, headers, cb) {
   var errState = null
   var prev = null
 
+  console.error('requesting', url)
   request({ encoding: null,
             url: 'http://localhost:' + port + url,
             headers: headers }, next)
@@ -54,7 +55,7 @@ function req (url, headers, cb) {
     if (er)
       return cb(errState = er, res, body)
     if (++reqs === 2) {
-      console.error('done with reqs')
+      console.error('done with reqs', url)
       assert.equal(res.statusCode, prev.res.statusCode)
       // compare dates, they should be approximately the same
       assert(Math.abs(new Date(res.headers.date).getTime() -
@@ -79,7 +80,7 @@ test('setup middleware server', function (t) {
       })
     })
   })
-  middlewareServer.listen(port, function () {
+  middlewareServer.listen(port, '127.0.0.1', function () {
     t.pass('listening')
     t.end()
   })
@@ -92,7 +93,7 @@ test('setup regular server', function (t) {
       return res.end('Not a match: ' + req.url)
     }
   })
-  server.listen(port + 1, function () {
+  server.listen(port + 1, '127.0.0.1', function () {
     t.pass('listening')
     t.end()
   })
@@ -198,8 +199,10 @@ test('many parallel requests', function (t) {
   }
 
   function next (r) { return function (er, res, body) {
-    if (er)
+    if (er) {
+      console.error('problem with', r[0])
       throw er
+    }
 
     t.pass(r[0])
     t.ok(res)
