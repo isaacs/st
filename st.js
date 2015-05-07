@@ -165,8 +165,7 @@ Mount.prototype.getCacheOptions = function (opt) {
 }
 
 // get a path from a url
-Mount.prototype.getPath = function (u) {
-  var p = url.parse(u).pathname
+Mount.prototype.getPath = function (p) {
 
   // Encoded dots are dots
   p = p.replace(/%2e/ig, '.')
