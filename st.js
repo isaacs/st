@@ -104,6 +104,7 @@ function st (opt) {
   p = path.resolve(p)
   if (!u) u = opt.url
   if (!u) u = ''
+  if (typeof u !== 'string') throw new Error('URL not a string')
   if (u.charAt(0) !== '/') u = '/' + u
 
   opt.url = u
