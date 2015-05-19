@@ -1,6 +1,6 @@
 {
   "name": "st",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "A module for serving static files.  Does etags, caching, etc.",
   "main": "st.js",
   "bin": "bin/server.js",
