@@ -572,11 +572,19 @@ Mount.prototype._loadStat = function (key, cb) {
   }
 }
 
-Mount.prototype._loadContent = function () {
+Mount.prototype._loadContent = function (key, cb) {
   // this function should never be called.
   // we check if the thing is in the cache, and if not, stream it in
   // manually.  this.cache.content.get() should not ever happen.
-  throw new Error('This should not ever happen')
+  var c = this.cache.content._cache[key]
+  var h = this.cache.content.has(key)
+
+  throw new Error('This should not ever happen' +
+    '\ncache: ' + c +
+    '\nkey: ' + key +
+    '\nhas: ' + h +
+    '\nexpected: undefined, ?, true'
+  )
 }
 
 function getEtag (s) {
