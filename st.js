@@ -368,9 +368,11 @@ Mount.prototype.file = function (p, fd, stat, etag, req, res, end) {
 
   // only use the content cache if it will actually fit there.
   if (this.cache.content.has(key)) {
+    console.log('has: ' + key)
     end()
     this.cachedFile(p, stat, etag, req, res)
   } else {
+    console.log('does not have: ' + key)
     this.streamFile(p, fd, stat, etag, req, res, end)
   }
 }
@@ -572,11 +574,23 @@ Mount.prototype._loadStat = function (key, cb) {
   }
 }
 
-Mount.prototype._loadContent = function () {
+Mount.prototype._loadContent = function (key, cb) {
   // this function should never be called.
   // we check if the thing is in the cache, and if not, stream it in
   // manually.  this.cache.content.get() should not ever happen.
-  throw new Error('This should not ever happen')
+  var c = this.cache.content._cache[key]
+  var h = this.cache.content.has(key)
+
+  throw new Error('This should not ever happen' +
+    '\ncache: ' + c +
+    '\nkey: ' + key +
+    '\nhas: ' + h +
+    '\nexpected: undefined, ?, true'
+  )
+
+  // cache: undefined
+  // key: 1192:"64769-5426-1431111370000"
+  // has: false
 }
 
 function getEtag (s) {

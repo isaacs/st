@@ -74,7 +74,6 @@ test('does not set headers if passthrough is set', function (t){
     req.url='/';
 
     mount(req, res, function () {
-      console.error(res._headers)
       t.notOk(res._headers.length, 'headers are not set with no index')
       t.end()
     })
