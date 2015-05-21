@@ -221,8 +221,7 @@ Mount.prototype.serve = function (req, res, next) {
   }
 
   // querystrings are of no concern to us
-  if (!req.sturl)
-    req.sturl = url.parse(req.url).pathname
+  req.sturl = url.parse(req.url).pathname
 
   var p = this.getPath(req.sturl)
 
