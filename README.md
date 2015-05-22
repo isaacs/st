@@ -236,6 +236,14 @@ Gzip compression can be disabled by setting `gzip: false` on the options passed
 into `st()`. This is useful if your application already handles gzipping
 responses by other means.
 
+It's also possible to pre gzip files to front load the gzipping effort (or if
+you want to use more aggressive gzipping like
+[Zopfli](https://github.com/google/zopfli)). By setting `staticGzip: true` in
+the options, when a request is received st will look for the filename with a
+`.gz` suffix, and if it is found then those contents will be used instead
+(except for non-gzip requests). The statically gzipped contents will also be
+used for the cache as appropriate.
+
 ## Filtering Output
 
 If you want to do some fancy stuff to the file before sending it, you
@@ -244,6 +252,9 @@ object before passing it to the mount function.
 
 This is useful if you want to get the benefits of caching and gzipping
 and such, but serve stylus files as css, for example.
+
+When a statically gzipped file is encountered, this filter won't be applied. So
+don't pre-gzip files you want to apply filters to (or don't use static gzipping).
 
 ## Security Status
 

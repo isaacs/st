@@ -49,7 +49,8 @@ var defaultCacheOptions = {
       return n.length
     },
     maxAge: 1000 * 60 * 10
-  }
+  },
+  staticGzip: false
 }
 
 function st (opt) {
@@ -273,7 +274,7 @@ Mount.prototype.serve = function (req, res, next) {
       if (isDirectory) {
         end() // we won't need this fd for a directory in any case
         if (next && this.opt.passthrough === true && this._index === false) {
-          // this is done before if-modified-since and if-non-match checks so
+          // this is done before if-modified-since and if-none-match checks so
           // cached modified and etag values won't return 304's if we've since
           // switched to !index. See Issue #51.
           return next()
@@ -395,8 +396,9 @@ Mount.prototype.cachedFile = function (p, stat, etag, req, res) {
 
 Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
   var streamOpt = { fd: fd, start: 0, end: stat.size }
-  var stream = fs.createReadStream(p, streamOpt)
-  stream.destroy = function () {}
+  var noGzipFileStream = fs.createReadStream(p, streamOpt)
+  noGzipFileStream.destroy = function () {}
+  var gzipFileStream = fs.createReadStream(p + '.gz')
 
   // gzip only if not explicitly turned off or client doesn't accept it
   var gzOpt = this.opt.gzip !== false
@@ -409,28 +411,46 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
 
   // too late to effectively handle any errors.
   // just kill the connection if that happens.
-  stream.on('error', function(e) {
-    console.error('Error serving %s fd=%d\n%s', p, fd, e.stack || e.message)
-    res.socket.destroy()
-    end()
-  })
+  var killConnection = function(filePath) {
+    return function(e) {
+      console.error('Error serving %s fd=%d\n%s', filePath, fd, e.stack || e.message)
+      res.socket.destroy()
+      end()
+    }
+  }
+  noGzipFileStream.on('error', killConnection(p))
+  // Avoid uncaught error issues
+  gzipFileStream.on('error', function() {})
 
-  if (res.filter) stream = stream.pipe(res.filter)
+  if (res.filter) noGzipFileStream = noGzipFileStream.pipe(res.filter)
 
   res.statusCode = 200
 
   if (gz) {
     // we don't know how long it'll be, since it will be compressed.
     res.setHeader('content-encoding', 'gzip')
-    stream.pipe(gzstr).pipe(res)
+    if(this.opt.staticGzip) {
+      gzipFileStream.on('error', function(e) {
+        if(e.code === 'ENOENT') {
+          noGzipFileStream.pipe(gzstr).pipe(res)
+        } else {
+          killConnection(p + '.gz')(e)
+        }
+      })
+      gzipFileStream.on('readable', function() {
+        gzipFileStream.pipe(res)
+      })
+    } else {
+      noGzipFileStream.pipe(gzstr).pipe(res)
+    }
   } else {
     if (!res.filter) res.setHeader('content-length', stat.size)
-    stream.pipe(res)
-    if (gzstr)
-      stream.pipe(gzstr) // for cache
+    noGzipFileStream.pipe(res)
+    if (gzstr && !this.opt.staticGzip)
+      noGzipFileStream.pipe(gzstr) // for cache
   }
 
-  stream.on('end', function () {
+  noGzipFileStream.on('end', function () {
     process.nextTick(end)
   })
 
@@ -453,11 +473,23 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
     var bufs = bl(collectEnd)
     var gzbufs
 
-    stream.pipe(bufs)
+    noGzipFileStream.pipe(bufs)
 
     if (gzstr) {
       gzbufs = bl(collectEnd)
-      gzstr.pipe(gzbufs)
+      if(this.opt.staticGzip) {
+        gzipFileStream.on('error', function(e) {
+          noGzipFileStream.pipe(gzstr).pipe(gzbufs)
+          if(e.code == 'ENOENT')
+            return
+          console.error('Error writing gzipped file to cache %s.gz fd=%d\n%s', p, fd, e.stack || e.message)
+        })
+        gzipFileStream.on('readable', function() {
+          gzipFileStream.pipe(gzbufs)
+        })
+      } else {
+        gzstr.pipe(gzbufs)
+      }
     }
   }
 }
