@@ -8,6 +8,7 @@ var dot = false
 var index = true
 var cache = true
 var age = null
+var staticGzip = false
 
 for (var i = 2; i < process.argv.length; i++) {
   switch (process.argv[i]) {
@@ -71,6 +72,17 @@ for (var i = 2; i < process.argv.length; i++) {
       }
       age = +age
       break
+
+    case '-s':
+    case '--static-gzip':
+      staticGzip = true
+      break
+
+    case '-ns':
+    case '--no-static-gzip':
+      staticGzip = false
+      break
+
   }
 }
 
@@ -113,6 +125,7 @@ var opt = {
   path: dir,
   index: index,
   dot: dot,
+  staticGzip: staticGzip,
   cache: {
     fd: {},
     stat: {},
