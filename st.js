@@ -437,7 +437,7 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
           killConnection(p + '.gz')(e)
         }
       })
-      gzipFileStream.on('readable', function() {
+      gzipFileStream.once('readable', function() {
         gzipFileStream.pipe(res)
       })
     } else {
@@ -484,7 +484,7 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
             return
           console.error('Error writing gzipped file to cache %s.gz fd=%d\n%s', p, fd, e.stack || e.message)
         })
-        gzipFileStream.on('readable', function() {
+        gzipFileStream.once('readable', function() {
           gzipFileStream.pipe(gzbufs)
         })
       } else {
