@@ -479,7 +479,8 @@ Mount.prototype.streamFile = function (p, fd, stat, etag, req, res, end) {
       gzbufs = bl(collectEnd)
       if(this.opt.staticGzip) {
         gzipFileStream.on('error', function(e) {
-          noGzipFileStream.pipe(gzstr).pipe(gzbufs)
+          // Data is already in gzstr if it was a gzip request (because of the error handler when sending to the client)
+          ( gz ? gzstr : noGzipFileStream.pipe(gzstr) ).pipe(gzbufs)
           if(e.code == 'ENOENT')
             return
           console.error('Error writing gzipped file to cache %s.gz fd=%d\n%s', p, fd, e.stack || e.message)
