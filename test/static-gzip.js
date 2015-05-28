@@ -1,6 +1,7 @@
 // turn on static gzip compression
 global.options = {
-  staticGzip: true
+  staticGzip: true,
+  gzip: true
 }
 
 var fs = require('fs')
