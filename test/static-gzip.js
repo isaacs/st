@@ -1,4 +1,4 @@
-// turn off gzip compression
+// turn on static gzip compression
 global.options = {
   staticGzip: true
 }
@@ -10,13 +10,12 @@ var req = basic.req
 var mount = basic.mount
 var stExpect = basic.stExpect
 
-// additional test to ensure that it's actually not gzipping
+// test to ensure that the request returns the statically gzipped contents
 var test = require('tap').test
 
 test('gzip-static', function (t) {
   zlib.gzip(stExpect, function(er, gzipped) {
     if (er) throw er;
-    process.stdout.write(gzipped.toString())
     fs.writeFile('../tmp.txt.gz', gzipped, function(er) {
       fs.writeFile('../tmp.txt', 'this shouldn\'t be returned', function(er) {
         if (er) throw er;
