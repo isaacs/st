@@ -133,7 +133,7 @@ Mount.prototype.getCacheOptions = function (opt) {
   var o = opt.cache
     , set = function (key) {
         return o[key] === false
-          ? none
+          ? util._extend({}, none)
           : util._extend(util._extend({}, d[key]), o[key])
       }
 
