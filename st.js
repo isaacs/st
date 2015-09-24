@@ -237,7 +237,7 @@ Mount.prototype.serve = function (req, res, next) {
 
   // don't allow dot-urls by default, unless explicitly allowed.
   // If we got a 403, then it's explicitly forbidden.
-  if (p === 403 || !this.opt.dot && p.match(/(^|\/)\./)) {
+  if (p === 403 || !this.opt.dot && req.sturl.match(/(^|\/)\./)) {
     res.statusCode = 403
     res.end('Forbidden')
     return true
