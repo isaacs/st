@@ -106,9 +106,9 @@ function help () {
 ,''
 ,'-n. --no-dot          Same as "--dot false"'
 ,''
-,'-nc --no-cache        Turn off all caching.'
+,'-co --cors            Enable CORS to serve files to any domain.'
 ,''
-,'-co --cors            Enable CORS.'
+,'-nc --no-cache        Turn off all caching.'
 ,''
 ,'-a --age AGE          Max age (in ms) of cache entries.'
 ].join('\n'))
