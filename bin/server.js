@@ -3,6 +3,7 @@ var st = require('../st.js')
 var http = require('http')
 var port = +(process.env.PORT || 1337)
 var dir = ''
+var url = '/'
 var cacheSize = 0
 var dot = false
 var index = true
@@ -20,6 +21,11 @@ for (var i = 2; i < process.argv.length; i++) {
     case '-d':
     case '--dir':
       dir = process.argv[++i]
+      break
+
+    case '-u':
+    case '--url':
+      url = process.argv[++i]
       break
 
     case '-.':
@@ -93,6 +99,8 @@ function help () {
 ,''
 ,'-d --dir DIRECTORY    Serve the contents of DIRECTORY (default=cwd)'
 ,''
+,'-u --url /url         Serve at this mount url (default=/)'
+,''
 ,'-i --index [INDEX]    Use the specified INDEX filename as the result'
 ,'                      when a directory is requested.  Set to "true"'
 ,'                      to turn autoindexing on, or "false" to turn it'
@@ -117,8 +125,8 @@ function help () {
 if (isNaN(port)) throw new Error('invalid port: '+port)
 
 var opt = {
-  url: '/',
   path: dir,
+  url: url,
   index: index,
   dot: dot,
   cache: {
