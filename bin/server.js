@@ -8,6 +8,7 @@ var dot = false
 var index = true
 var cache = true
 var age = null
+var cors = false
 
 for (var i = 2; i < process.argv.length; i++) {
   switch (process.argv[i]) {
@@ -71,6 +72,11 @@ for (var i = 2; i < process.argv.length; i++) {
       }
       age = +age
       break
+
+    case '-co':
+    case '--cors':
+      cors = true;
+      break
   }
 }
 
@@ -102,6 +108,8 @@ function help () {
 ,''
 ,'-nc --no-cache        Turn off all caching.'
 ,''
+,'-co --cors            Enable CORS.'
+,''
 ,'-a --age AGE          Max age (in ms) of cache entries.'
 ].join('\n'))
 }
@@ -119,7 +127,8 @@ var opt = {
     index: {},
     readdir: {},
     content: {}
-  }
+  },
+  cors: cors
 }
 
 if (cache === false) {
