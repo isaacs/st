@@ -303,6 +303,12 @@ Mount.prototype.serve = function (req, res, next) {
       res.setHeader('last-modified', stat.mtime.toUTCString())
       res.setHeader('etag', etag)
 
+      if (this.opt.cors) {
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Headers',
+          'Origin, X-Requested-With, Content-Type, Accept, Range')
+      }
+
       return isDirectory
         ? this.index(p, req, res)
         : this.file(p, fd, stat, etag, req, res, end)
