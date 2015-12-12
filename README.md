@@ -70,6 +70,19 @@ http.createServer(function(req, res) {
 }).listen(1341);
 ```
 
+Serve the files with
+[CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS)
+enabled, to serve static files to any domain:
+
+```javascript
+http.createServer(
+  st({
+   path: process.cwd(),
+   cors: true
+  })
+).listen(1337)
+```
+
 
 Pass some options to the `st` function, and it returns a handler
 function.
@@ -141,6 +154,9 @@ var mount = st({
 
   gzip: true, // default: compresses the response with gzip compression
   gzip: false, // does not compress the response, even if client accepts gzip
+
+  cors: false, // default: static assets not accessible from other domains
+  cors: true, // static assets can be accessed from any domain
 })
 
 // with bare node.js
@@ -184,6 +200,8 @@ Options:
                       disable.
 
 -n. --no-dot          Same as "--dot false"
+
+-co --cors            Enable CORS to serve files to any domain.
 
 -nc --no-cache        Turn off all caching.
 
@@ -232,7 +250,7 @@ cache.index.max bytes would seem to allow.  This will be less than
 double, and usually insignificant for normal web assets, but is
 important to consider if memory is at a premium.
 
-Gzip compression can be disabled by setting `gzip: false` on the options passed 
+Gzip compression can be disabled by setting `gzip: false` on the options passed
 into `st()`. This is useful if your application already handles gzipping
 responses by other means.
 
