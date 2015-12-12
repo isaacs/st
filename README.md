@@ -172,6 +172,8 @@ Options:
 
 -d --dir DIRECTORY    Serve the contents of DIRECTORY (default=cwd)
 
+-u --url MOUNTURL     Serve the contents at MOUNTURL mount path (default=/)
+
 -i --index [INDEX]    Use the specified INDEX filename as the result
                       when a directory is requested.  Set to "true"
                       to turn autoindexing on, or "false" to turn it
