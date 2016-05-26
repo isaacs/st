@@ -27,6 +27,11 @@ for (var i = 2; i < process.argv.length; i++) {
       }
       break
 
+    case '-l':
+    case '--localhost':
+      host = 'localhost'
+      break
+
     case '-d':
     case '--dir':
       dir = process.argv[++i]
@@ -107,6 +112,8 @@ function help () {
 ,'-p --port PORT        Listen on PORT (default=1337)'
 ,''
 ,'-H --host HOST        Bind address HOST (default=*)'
+,''
+,'-l --localhost        Same as "--host localhost"'
 ,''
 ,'-d --dir DIRECTORY    Serve the contents of DIRECTORY (default=cwd)'
 ,''
