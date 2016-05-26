@@ -186,6 +186,8 @@ Options:
 
 -p --port PORT        Listen on PORT (default=1337)
 
+-H --host HOST        Bind address HOST (default=*)
+
 -d --dir DIRECTORY    Serve the contents of DIRECTORY (default=cwd)
 
 -u --url MOUNTURL     Serve the contents at MOUNTURL mount path (default=/)
@@ -278,3 +280,7 @@ not, will be replaced with `'/'`.  If your application depends on url
 traversal, then you are encouraged to please refactor so that you do
 not depend on having `..` in url paths, as this tends to expose data
 that you may be surprised to be exposing.
+
+Consider using the `--host localhost` setting if you don't want other
+people on your local network to read the files served by the command
+line server.  This may become the default in a future major version.
