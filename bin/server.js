@@ -2,6 +2,7 @@
 var st = require('../st.js')
 var http = require('http')
 var port = +(process.env.PORT || 1337)
+var host = undefined
 var dir = ''
 var url = '/'
 var cacheSize = 0
@@ -16,6 +17,14 @@ for (var i = 2; i < process.argv.length; i++) {
     case '-p':
     case '--port':
       port = +(process.argv[++i])
+      break
+
+    case '-H':
+    case '--host':
+      host = process.argv[++i]
+      if (host === '*') {
+        host = undefined
+      }
       break
 
     case '-d':
@@ -97,6 +106,8 @@ function help () {
 ,''
 ,'-p --port PORT        Listen on PORT (default=1337)'
 ,''
+,'-H --host HOST        Bind address HOST (default=*)'
+,''
 ,'-d --dir DIRECTORY    Serve the contents of DIRECTORY (default=cwd)'
 ,''
 ,'-u --url /url         Serve at this mount url (default=/)'
@@ -156,10 +167,12 @@ http.createServer(function (q, s) {
   if (mount(q, s)) return
   s.statusCode = 404
   s.end('not found')
-}).listen(port, function() {
+}).listen(port, host, function() {
   var addr = this.address()
   var port = addr.port
-  var host = addr.address
+  if (!host) {
+    host = addr.address
+  }
   if (/:/.test(host)) {
     host = '[' + host + ']'
   }
