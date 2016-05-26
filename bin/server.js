@@ -156,6 +156,12 @@ http.createServer(function (q, s) {
   if (mount(q, s)) return
   s.statusCode = 404
   s.end('not found')
-}).listen(port)
-
-console.log('listening at http://127.0.0.1:' + port)
+}).listen(port, function() {
+  var addr = this.address()
+  var port = addr.port
+  var host = addr.address
+  if (/:/.test(host)) {
+    host = '[' + host + ']'
+  }
+  console.log('listening at http://' + host + ':' + port)
+})
