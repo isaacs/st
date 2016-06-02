@@ -20,7 +20,7 @@
     "tap": "~2.3.1"
   },
   "scripts": {
-    "test": "tap test/*.js"
+    "test": "tap test/*.js test/cli/*-test.js"
   },
   "repository": {
     "type": "git",
