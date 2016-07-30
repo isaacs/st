@@ -15,9 +15,9 @@
     "graceful-fs": "~4.1.4"
   },
   "devDependencies": {
-    "request": "~2.72.0",
+    "request": "~2.74.0",
     "rimraf": "~2.5.2",
-    "tap": "~5.8.0"
+    "tap": "~6.2.0"
   },
   "scripts": {
     "test": "tap test/*.js test/cli/*-test.js"
