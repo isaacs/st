@@ -11,12 +11,18 @@ var index = true
 var cache = true
 var age = null
 var cors = false
+var findPort = false
 
 for (var i = 2; i < process.argv.length; i++) {
   switch (process.argv[i]) {
     case '-p':
     case '--port':
       port = +(process.argv[++i])
+      break
+
+    case '-fp':
+    case '--find-port':
+      findPort = true
       break
 
     case '-H':
@@ -170,18 +176,30 @@ if (cache === false) {
 
 var mount = st(opt)
 
-http.createServer(function (q, s) {
-  if (mount(q, s)) return
-  s.statusCode = 404
-  s.end('not found')
-}).listen(port, host, function() {
-  var addr = this.address()
-  var port = addr.port
-  if (!host) {
-    host = addr.address
-  }
-  if (/:/.test(host)) {
-    host = '[' + host + ']'
-  }
-  console.log('listening at http://' + host + ':' + port)
-})
+runServer()
+
+function runServer() {
+  http.createServer(function (q, s) {
+    if (mount(q, s)) return
+    s.statusCode = 404
+    s.end('not found')
+  }).once('error', function (err) {
+    if (findPort && err.code === 'EADDRINUSE') {
+      console.log('port ' + port + ' already in use')
+      port++
+      runServer()
+    } else {
+      throw err;
+    }
+  }).listen(port, host, function () {
+    var addr = this.address()
+    var port = addr.port
+    if (!host) {
+      host = addr.address
+    }
+    if (/:/.test(host)) {
+      host = '[' + host + ']'
+    }
+    console.log('listening at http://' + host + ':' + port)
+  })
+}
