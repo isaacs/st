@@ -15,7 +15,7 @@
     "graceful-fs": "~4.1.4"
   },
   "devDependencies": {
-    "request": "~2.72.0",
+    "request": "~2.75.0",
     "rimraf": "~2.5.2",
     "tap": "~5.8.0"
   },
