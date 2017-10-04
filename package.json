@@ -8,7 +8,7 @@
     "async-cache": "~1.1.0",
     "bl": "~1.1.2",
     "fd": "~0.0.2",
-    "mime": "~1.3.4",
+    "mime": "~1.4.1",
     "negotiator": "~0.6.1"
   },
   "optionalDependencies": {
