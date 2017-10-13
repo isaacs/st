@@ -123,3 +123,13 @@ test('shenanigans', function(t) {
     t.end()
   })
 })
+
+
+test('shenanigans2', function(t) {
+  req('/test//foo/%2e%2E', function(er, res) {
+    if (er)
+      throw er
+    t.equal(res.statusCode, 403)
+    t.end()
+  })
+})

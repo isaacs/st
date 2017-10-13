@@ -26,7 +26,8 @@ function req (url, headers, cb) {
   if (typeof headers === 'function') cb = headers, headers = {}
   request({ encoding: null,
             url: 'http://localhost:' + port + url,
-            headers: headers }, cb)
+            headers: headers,
+            followRedirect: false }, cb)
 }
 
 

@@ -164,8 +164,8 @@ Mount.prototype.getCacheOptions = function (opt) {
   return c
 }
 
-// get a path from a url
-Mount.prototype.getPath = function (u) {
+// get the path component from a URI
+Mount.prototype.getUriPath = function (u) {
   var p = url.parse(u).pathname
 
   // Encoded dots are dots
@@ -179,8 +179,7 @@ Mount.prototype.getPath = function (u) {
 
   // Make sure it starts with a slash
   p = p.replace(/^\//, '/')
-
-  if (p.match(/[\/\\]\.\.[\/\\]/)) {
+  if ((/[\/\\]\.\.([\/\\]|$)/).test(p)) {
     // traversal urls not ever even slightly allowed. clearly shenanigans
     // send a 403 on that noise, do not pass go, do not collect $200
     return 403
@@ -202,8 +201,12 @@ Mount.prototype.getPath = function (u) {
   u = u.substr(this.url.length)
   if (u.charAt(0) !== '/') u = '/' + u
 
-  p = path.join(this.path, u)
-  return p
+  return u
+}
+
+// get a path from a url
+Mount.prototype.getPath = function (u) {
+  return path.join(this.path, u)
 }
 
 // get a url from a path
@@ -223,25 +226,25 @@ Mount.prototype.serve = function (req, res, next) {
 
   // querystrings are of no concern to us
   if (!req.sturl)
-    req.sturl = url.parse(req.url).pathname
-
-  var p = this.getPath(req.sturl)
-
-  // Falsey here means we got some kind of invalid path.
-  // Probably urlencoding we couldn't understand, or some
-  // other "not compatible with st, but maybe ok" thing.
-  if (!p) {
-    if (typeof next === 'function') next()
-    return false
-  }
+    req.sturl = this.getUriPath(req.url)
 
   // don't allow dot-urls by default, unless explicitly allowed.
   // If we got a 403, then it's explicitly forbidden.
-  if (p === 403 || !this.opt.dot && req.sturl.match(/(^|\/)\./)) {
+  if (req.sturl === 403 || (!this.opt.dot && (/(^|\/)\./).test(req.sturl))) {
     res.statusCode = 403
     res.end('Forbidden')
     return true
   }
+
+  // Falsey here means we got some kind of invalid path.
+  // Probably urlencoding we couldn't understand, or some
+  // other "not compatible with st, but maybe ok" thing.
+  if (typeof req.sturl !== 'string' || req.sturl == '') {
+    if (typeof next === 'function') next()
+    return false
+  }
+
+  var p = this.getPath(req.sturl)
 
   // now we have a path.  check for the fd.
   this.cache.fd.get(p, function (er, fd) {
