@@ -1,53 +1,64 @@
-var path = require('path')
-var fs = require('fs')
-var http = require('http')
-var util = require('util')
-var request = require('request')
-var tap = require('tap')
+const path = require('path')
+const fs = require('fs')
+const http = require('http')
+const request = require('request')
+const { test, tearDown } = require('tap')
 
-var st = require('../st.js')
+const st = require('../st.js')
 
-var port = process.env.PORT || 1337
-var test = tap.test
+let address
+let server
 
-var server
-
-var opts = util._extend({
+const opts = Object.assign({
   autoindex: true,
   path: path.dirname(__dirname),
   url: '/test'
 }, global.options || {})
 
-var stExpect = fs.readFileSync(require.resolve('../st.js'), 'utf8')
-var mount = st(opts)
-
+const stExpect = fs.readFileSync(require.resolve('../st.js'), 'utf8')
+const mount = st(opts)
 
 function req (url, headers, cb) {
-  if (typeof headers === 'function') cb = headers, headers = {}
-  request({ encoding: null,
-            url: 'http://localhost:' + port + url,
-            headers: headers,
-            followRedirect: false }, cb)
+  if (typeof headers === 'function') {
+    cb = headers
+    headers = {}
+  }
+
+  let host = address.address
+  if (address.family === 'IPv6') {
+    host = `[${host}]`
+  }
+
+  request({
+    encoding: null,
+    url: `http://${host}:${address.port}${url}`,
+    headers: headers,
+    followRedirect: false
+  }, cb)
 }
 
-
-test('setup', function (t) {
-  server = http.createServer(function (req, res) {
-    if (!mount(req, res)) {
-      res.statusCode = 404
-      return res.end('Not a match: ' + req.url)
+test('setup', (t) => {
+  server = http.createServer((req, res) => {
+    try {
+      if (!mount(req, res)) {
+        res.statusCode = 404
+        return res.end(`Not a match: ${req.url}`)
+      }
+    } catch (e) {
+      res.statusCode = 500
+      console.error(e)
+      return res.end(`Internal error: ${e.message}`)
     }
-  }).listen(port, function () {
+  }).listen(() => {
     t.pass('listening')
+    address = server.address()
     t.end()
   })
 })
 
-
-tap.tearDown(function() {
+tearDown(() => {
   server.close()
 })
-
 
 module.exports.mount = mount
 module.exports.req = req

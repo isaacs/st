@@ -3,21 +3,16 @@ global.options = {
   gzip: false
 }
 
-var basic = require('./basic.js')
-var req = basic.req
-var mount = basic.mount
-var stExpect = basic.stExpect
+const { test } = require('tap')
+const { req, stExpect } = require('./basic.js')
 
 // additional test to ensure that it's actually not gzipping
-var test = require('tap').test
 
-test('does not gzip the response', function(t) {
-  req('/test/st.js', {'accept-encoding':'gzip'},
-      function (er, res, body) {
+test('does not gzip the response', (t) => {
+  req('/test/st.js', { 'accept-encoding': 'gzip' }, (er, res, body) => {
     t.equal(res.statusCode, 200)
     t.notOk(res.headers['content-encoding'])
     t.equal(body.toString(), stExpect)
     t.end()
   })
 })
-

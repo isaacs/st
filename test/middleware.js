@@ -1,23 +1,17 @@
-var st = require('../st.js')
-var test = require('tap').test
-var port = process.env.PORT || 1337
-var util = require('util')
-var path = require('path')
+const st = require('../st.js')
+const { test } = require('tap')
+const path = require('path')
 
-var opts = util._extend({
+const opts = Object.assign({
   autoindex: true,
   path: path.dirname(__dirname),
   url: '/test'
 }, global.options || {})
 
-var mount = st(opts)
+const mount = st(opts)
 
-test('call next() if asset not found', function (t) {
-  var req = { url: '/does-not-exist?a=b' }
-  var res = {}
+test('call next() if asset not found', (t) => {
+  const req = { url: '/does-not-exist?a=b' }
   t.plan(1)
-  function next() {
-    t.equal(req.url, '/does-not-exist?a=b')
-  }
-  mount(req, req, next)
+  mount(req, req, () => t.equal(req.url, '/does-not-exist?a=b'))
 })

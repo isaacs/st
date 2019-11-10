@@ -1,60 +1,64 @@
-var st = require('../st.js')
-var tap = require('tap')
-var test = require('tap').test
-var util = require('util')
-var path = require('path')
-var http = require('http')
-var request = require('request')
-var port = process.env.PORT || 1337
+const st = require('../st.js')
+const { test, tearDown } = require('tap')
+const path = require('path')
+const http = require('http')
+const request = require('request')
+const port = process.env.PORT || 1337
 
-var opts = util._extend({
+const opts = Object.assign({
   index: false,
   path: path.dirname(__dirname),
   url: '/test'
 }, global.options || {})
 
-var mount = st(opts)
-var server
-var cacheControl = null
+const mount = st(opts)
+let server
+let cacheControl = null
 
 function req (url, headers, cb) {
-  if (typeof headers === 'function') cb = headers, headers = {}
-  request({ encoding: null,
-            url: 'http://localhost:' + port + url,
-            headers: headers }, cb)
+  if (typeof headers === 'function') {
+    cb = headers
+    headers = {}
+  }
+  request({
+    encoding: null,
+    url: 'http://localhost:' + port + url,
+    headers: headers
+  }, cb)
 }
 
-tap.test('setup', function (t) {
-  server = http.createServer(function (req, res) {
-    if (cacheControl)
+test('setup', (t) => {
+  server = http.createServer((req, res) => {
+    if (cacheControl) {
       res.setHeader('cache-control', cacheControl)
+    }
     if (!mount(req, res)) {
       res.statusCode = 404
       return res.end('Not a match: ' + req.url)
     }
-  }).listen(port, function () {
+  }).listen(port, () => {
     t.pass('listening')
     t.end()
   })
 })
 
-tap.tearDown(function() {
+tearDown(() => {
   server.close()
 })
 
-tap.test('simple request', function (t) {
+test('simple request', (t) => {
   cacheControl = null
-  req('/test/st.js', function (er, res, body) {
-    t.ifError(er)
+  req('/test/st.js', (er, res, body) => {
+    t.error(er)
     t.equal(res.headers['cache-control'], 'public, max-age=600')
     t.end()
   })
 })
 
-tap.test('pre-set cache-control', function (t) {
+test('pre-set cache-control', (t) => {
   cacheControl = 'I\'m so excited, and I just can\'t hide it'
-  req('/test/st.js', function (er, res, body) {
-    t.ifError(er)
+  req('/test/st.js', (er, res, body) => {
+    t.error(er)
     t.equal(res.headers['cache-control'], cacheControl)
     t.end()
   })

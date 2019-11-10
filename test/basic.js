@@ -1,20 +1,16 @@
-var zlib = require('zlib')
-var test = require('tap').test
-var common = require('./common')
+const zlib = require('zlib')
+const { test } = require('tap')
+const { req, stExpect, opts, mount } = require('./common')
 
-var req = common.req
-var stExpect = common.stExpect
-var opts = common.opts
+module.exports.req = req
+module.exports.stExpect = stExpect
+module.exports.mount = mount
 
-var stEtag
+let stEtag
 
-module.exports.mount = common.mount
-module.exports.req = common.req
-module.exports.stExpect = common.stExpect
-
-
-test('simple request', function (t) {
-  req('/test/st.js', function (er, res, body) {
+test('simple request', (t) => {
+  req('/test/st.js', (er, res, body) => {
+    t.error(er)
     t.equal(res.statusCode, 200)
     t.ok(/\/javascript$/.test(res.headers['content-type']))
     t.ok(res.headers.etag)
@@ -24,34 +20,33 @@ test('simple request', function (t) {
   })
 })
 
-
-test('304 request', function (t) {
-  req('/test/st.js', {'if-none-match':stEtag}, function (er, res, body) {
+test('304 request', (t) => {
+  req('/test/st.js', { 'if-none-match': stEtag }, (er, res, body) => {
     t.equal(res.statusCode, 304)
     t.equal(body.length, 0)
     t.end()
   })
 })
 
-
 if (opts.gzip !== false) {
-  test('gzip', function (t) {
-    req('/test/st.js', {'accept-encoding':'gzip'},
-        function (er, res, body) {
-      t.equal(res.statusCode, 200)
-      t.equal(res.headers['content-encoding'], 'gzip')
-      zlib.gunzip(body, function (er, body) {
-        if (er) throw er;
-        t.equal(body.toString(), stExpect)
-        t.end()
+  test('gzip', (t) => {
+    req('/test/st.js', { 'accept-encoding': 'gzip' },
+      (er, res, body) => {
+        t.equal(res.statusCode, 200)
+        t.equal(res.headers['content-encoding'], 'gzip')
+        zlib.gunzip(body, (er, body) => {
+          if (er) {
+            throw er
+          }
+          t.equal(body.toString(), stExpect)
+          t.end()
+        })
       })
-    })
   })
 }
 
-
-test('multiball!', function (t) {
-  var n = 6
+test('multiball!', (t) => {
+  let n = 6
   req('/test/st.js', then)
   req('/test/README.md', then)
   req('/test/LICENSE', then)
@@ -60,13 +55,14 @@ test('multiball!', function (t) {
   req('/test/bin/server.js', then)
 
   function then (er, res) {
-    if (er)
+    if (er) {
       throw er
+    }
     t.equal(res.statusCode, 200)
 
     // give them all time to close, then go again.
-    if (--n === 0)
-      setTimeout(function () {
+    if (--n === 0) {
+      setTimeout(() => {
         n = 6
         req('/test/st.js', then2)
         req('/test/README.md', then2)
@@ -75,60 +71,62 @@ test('multiball!', function (t) {
         req('/test/favicon.ico', then2)
         req('/test/bin/server.js', then2)
       }, 200)
+    }
   }
 
   function then2 (er, res) {
-    if (er)
+    if (er) {
       throw er
+    }
 
     t.equal(res.statusCode, 200)
 
-    if (opts.cache === false)
+    if (opts.cache === false) {
       t.equal(res.headers['cache-control'], 'no-cache')
-    else if (opts.cache && opts.cache.content && opts.cache.content.maxAge === false)
+    } else if (opts.cache && opts.cache.content && opts.cache.content.maxAge === false) {
       t.ok(res.headers['cache-control'] === undefined)
-    else if (opts.cache && opts.cache.content && opts.cache.content.cacheControl)
+    } else if (opts.cache && opts.cache.content && opts.cache.content.cacheControl) {
       t.equal(res.headers['cache-control'], opts.cache.content.cacheControl)
-    else
+    } else {
       t.equal(res.headers['cache-control'], 'public, max-age=600')
+    }
 
-    if (--n === 0)
+    if (--n === 0) {
       t.end()
+    }
   }
 })
 
-
-test('space in filename', function (t) {
-  req('/test/test/fixtures/space in filename.txt', function (er, res, body) {
+test('space in filename', (t) => {
+  req('/test/test/fixtures/space in filename.txt', (er, res, body) => {
     t.equal(res.statusCode, 200)
     t.ok(body)
     t.end()
   })
 })
 
-
-test('malformed URL', function (t) {
-  req('/test%2E%git', function (er, res) {
+test('malformed URL', (t) => {
+  req('/test%2E%git', (er, res) => {
     t.equal(res.statusCode, 404)
     t.end()
   })
 })
 
-
-test('shenanigans', function(t) {
-  req('/%2e%2E/%2e%2E/%2e%2E/%2e%2E/%2e%2E/%2e%2E/etc/passwd', function(er, res) {
-    if (er)
+test('shenanigans', (t) => {
+  req('/%2e%2E/%2e%2E/%2e%2E/%2e%2E/%2e%2E/%2e%2E/etc/passwd', (er, res) => {
+    if (er) {
       throw er
+    }
     t.equal(res.statusCode, 403)
     t.end()
   })
 })
 
-
-test('shenanigans2', function(t) {
-  req('/test//foo/%2e%2E', function(er, res) {
-    if (er)
+test('shenanigans2', (t) => {
+  req('/test//foo/%2e%2E', (er, res) => {
+    if (er) {
       throw er
+    }
     t.equal(res.statusCode, 403)
     t.end()
   })

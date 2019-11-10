@@ -1,32 +1,27 @@
 global.options = {
 }
 
-var fs = require('fs')
-var path = require('path')
-var crypto = require('crypto')
-var rimraf = require('rimraf')
-var common = require('./common.js')
-var req = common.req
-var mount = common.mount
-var stExpect = common.stExpect
+const fs = require('fs')
+const path = require('path')
+const crypto = require('crypto')
+const rimraf = require('rimraf')
+const { test } = require('tap')
+const { req } = require('./common.js')
+const testFileName = 'no-gzip-accepted.testfile'
+const testFile = path.join(__dirname, '../', testFileName)
 
-var test = require('tap').test
-var testFileName = 'bigfattestfile'
-var testFile = path.join(__dirname, '../', testFileName)
+const rndData = crypto.randomBytes(1024 * 128).toString('hex') // significantly larger than highWaterMark
 
-var rndData = crypto.randomBytes(1024 * 128).toString('hex') // significantly larger than highWaterMark
-
-test('does not gzip the response', function(t) {
-  t.on('end', function () {
-    rimraf(testFile, function () {})
+test('does not gzip the response', (t) => {
+  t.on('end', () => {
+    rimraf(testFile, () => {})
   })
 
-  fs.writeFile(testFile, rndData, function (err) {
-    t.notOk(err)
+  fs.writeFile(testFile, rndData, (err) => {
+    t.error(err)
 
-    req('/test/' + testFileName, {'accept-encoding':'none'},
-        function (er, res, body) {
-
+    req('/test/' + testFileName, { 'accept-encoding': 'none' }, (er, res, body) => {
+      t.error(er)
       t.equal(res.statusCode, 200)
       t.notOk(res.headers['content-encoding'])
       t.equal(body.toString(), rndData)
@@ -34,4 +29,3 @@ test('does not gzip the response', function(t) {
     })
   })
 })
-

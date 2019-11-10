@@ -1,4 +1,4 @@
-var path = require('path')
+const path = require('path')
 
 global.options = {
   path: path.dirname(__filename) + '/..'

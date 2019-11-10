@@ -1,19 +1,19 @@
 global.dot = true
 
-var common = require('./dot-common')
+const { test } = require('tap')
+const { req } = require('./dot-common')
 
-var req = common.req
-var test = common.test
-
-test('non-dotted file', function (t) {
-  req('/index.html', function (er, res, body) {
+test('non-dotted file', (t) => {
+  req('/index.html', (er, res, body) => {
+    t.error(er)
     t.equal(res.statusCode, 200)
     t.end()
   })
 })
 
-test('dotted file', function (t) {
-  req('/.index.html', function (er, res, body) {
+test('dotted file', (t) => {
+  req('/.index.html', (er, res, body) => {
+    t.error(er)
     t.equal(res.statusCode, 200)
     t.end()
   })

@@ -2,18 +2,12 @@ global.options = {
   cachedHeader: true // inspect to see if something is served from cache
 }
 
-var zlib = require('zlib')
-var common = require('./common.js')
-var req = common.req
-var stExpect = common.stExpect
+const zlib = require('zlib')
+const { req, stExpect } = require('./common.js')
+const { test } = require('tap')
 
-var test = require('tap').test
-
-
-test('does not gzip first response', function(t) {
-  req('/test/st.js', {'accept-encoding':'none'},
-      function (er, res, body) {
-
+test('does not gzip first response', (t) => {
+  req('/test/st.js', { 'accept-encoding': 'none' }, (er, res, body) => {
     t.equal(res.statusCode, 200)
     t.notOk(res.headers['content-encoding'])
     t.notOk(res.headers['x-from-cache'])
@@ -22,12 +16,9 @@ test('does not gzip first response', function(t) {
   })
 })
 
-
-test('gzips second response', function (t) {
-  req('/test/st.js', {'accept-encoding':'gzip'},
-      function (er, res, body) {
-
-    t.ifError(er, 'no error')
+test('gzips second response', (t) => {
+  req('/test/st.js', { 'accept-encoding': 'gzip' }, (er, res, body) => {
+    t.error(er, 'no error')
 
     t.equal(res.statusCode, 200)
     t.equal(res.headers['content-encoding'], 'gzip')
@@ -36,8 +27,10 @@ test('gzips second response', function (t) {
     t.ok(body, 'returned a body')
     t.notEqual(body.toString(), stExpect, 'gzipped string')
 
-    zlib.gunzip(body, function (er, body) {
-      if (er) throw er
+    zlib.gunzip(body, (er, body) => {
+      if (er) {
+        throw er
+      }
       t.equal(body.toString(), stExpect)
       t.end()
     })

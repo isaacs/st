@@ -1,38 +1,44 @@
-var path = require('path')
-var http = require('http')
-var request = require('request')
-var tap = require('tap')
+const path = require('path')
+const http = require('http')
+const request = require('request')
+const { test, tearDown } = require('tap')
 
-var st = require('../st.js')
+const st = require('../st.js')
 
-var port = process.env.PORT || 1337
-var test = exports.test = tap.test
+let address
+let server
 
-var server
-
-var opts = {
+const opts = {
   dot: global.dot,
-  path: path.join(__dirname, "fixtures", ".dotted-dir"),
+  path: path.join(__dirname, 'fixtures', '.dotted-dir')
 }
 
-var mount = st(opts)
+const mount = st(opts)
 
-exports.req = function req (url, cb) {
-  request({ url: 'http://localhost:' + port + url }, cb)
+const req = (url, cb) => {
+  let host = address.address
+  if (address.family === 'IPv6') {
+    host = `[${host}]`
+  }
+
+  request({ url: `http://${host}:${address.port}${url}` }, cb)
 }
 
-test('setup', function (t) {
-  server = http.createServer(function (req, res) {
+test('setup', (t) => {
+  server = http.createServer((req, res) => {
     if (!mount(req, res)) {
       res.statusCode = 404
-      return res.end('Not a match: ' + req.url)
+      return res.end(`Not a match: ${req.url}`)
     }
-  }).listen(port, function () {
+  }).listen(() => {
     t.pass('listening')
+    address = server.address()
     t.end()
   })
 })
 
-tap.tearDown(function() {
+tearDown(() => {
   server.close()
 })
+
+module.exports.req = req
