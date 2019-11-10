@@ -4,41 +4,47 @@ var test = tap.test
 var common = require('./common')
 var serve = common.serve
 
-var otherAddress = (function () {
+var otherAddress = (() => {
   var ifaces = os.networkInterfaces()
   for (var iface in ifaces) {
     var addrs = ifaces[iface]
     for (var i = 0; i < addrs.length; ++i) {
       var addr = addrs[i].address
-      if (/^127\./.test(addr) || /^::1$/.test(addr)) // loopback device
+      if (/^127\./.test(addr) || /^::1$/.test(addr)) { // loopback device
         continue
-      if (/^fe80:/.test(addr)) // link-local address
+      }
+      if (/^fe80:/.test(addr)) { // link-local address
         continue
+      }
       return addr
     }
   }
   return null
 })()
 if (!otherAddress) {
-  tap.fail('No non-loopback network address found', {skip: true})
-  test = function () {}
+  tap.fail('No non-loopback network address found', { skip: true })
+  test = () => {}
 } else {
   tap.comment('Using ' + otherAddress + ' as non-localhost address')
 }
 
 function addr2url (addr, path) {
-  if (/:/.test(addr)) addr = '[' + addr + ']'
+  if (/:/.test(addr)) {
+    addr = '[' + addr + ']'
+  }
   addr = 'http://' + addr + ':' + common.port
-  if (path) addr += path
+  if (path) {
+    addr += path
+  }
   return addr
 }
 
 function testServer (name, args, addr, canConnect, cannotConnect) {
-  test(name, function (t) {
-    serve(args, function (req) {
+  test(name, (t) => {
+    serve(args, (req) => {
       canConnect.forEach(checkConnections(t, req, true))
       cannotConnect.forEach(checkConnections(t, req, false))
-    }, function (err, stdout, stderr) {
+    }, (err, stdout, stderr) => {
       t.ifError(err)
       t.equal(stderr, '')
       if (addr) {
@@ -50,9 +56,9 @@ function testServer (name, args, addr, canConnect, cannotConnect) {
 }
 
 function checkConnections (t, req, canConnect) {
-  return function (addr) {
+  return (addr) => {
     var url = addr2url(addr, '/st.js')
-    req(url, function (er, res, body) {
+    req(url, (er, res, body) => {
       if (canConnect) {
         t.ifError(er, url) && t.equal(res.statusCode, 200, url)
       } else {

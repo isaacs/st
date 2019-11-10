@@ -1,79 +1,73 @@
-var st = require('../st.js')
-var test = require('tap').test
-var util = require('util')
-var path = require('path')
+const { test } = require('tap')
+const path = require('path')
+const st = require('../st.js')
 
-var opts = util._extend({
+const opts = Object.assign({
   index: false,
   path: path.resolve(__dirname, './fixtures'),
   url: '/',
   passthrough: true
 }, global.options || {})
 
-var mount = st(opts)
+const mount = st(opts)
 
-test('call next() if passthrough is set', function (t) {
-  var req = { method: 'GET', url: '/doesnotexist.txt', headers: {} }
-  var res = {
-    error: function () {
-      t.end()
-    },
-    setHeader: function () {},
-    end: function () {}
+test('call next() if passthrough is set', (t) => {
+  const req = { method: 'GET', url: '/doesnotexist.txt', headers: {} }
+  const res = {
+    error: () => t.end(),
+    setHeader: () => {},
+    end: () => {}
   }
   t.plan(2)
-  mount(req, res, function () {
-    t.ok(true, "next called with nonexistant file");
-    req.url='/';
-    mount(req, res, function () {
-      t.ok(true, "next called without indexing")
+  mount(req, res, () => {
+    t.ok(true, 'next called with nonexistant file')
+    req.url = '/'
+    mount(req, res, () => {
+      t.ok(true, 'next called without indexing')
       t.end()
-    });
+    })
   })
 })
 
-var opts2 = util._extend({
+const opts2 = Object.assign({
   autoindex: true,
   path: path.resolve(__dirname, './fixtures'),
   url: '/'
 }, global.options || {})
-mount2 = st(opts2)
+const mount2 = st(opts2)
 
-test('return error if passthrough is not set', function (t) {
-  var req = { method: 'GET', url: '/doesnotexist.txt', headers: {} }
-  var res = {
-    setHeader: function () {},
-    error: function () {
-      t.ok(true, "error used")
+test('return error if passthrough is not set', (t) => {
+  const req = { method: 'GET', url: '/doesnotexist.txt', headers: {} }
+  const res = {
+    setHeader: () => {},
+    error: () => {
+      t.ok(true, 'error used')
       t.end()
     },
-    end: function () {}
+    end: () => {}
   }
   t.plan(1)
-  mount2(req, res, function () {
+  mount2(req, res, () => {
     t.end()
   })
 })
 
-test('does not set headers if passthrough is set', function (t){
-  var req = { method: 'GET', url: '/doesnotexist.txt', headers: {} }
-  var res = {
-    error: function () {
-      t.end()
-    },
+test('does not set headers if passthrough is set', (t) => {
+  const req = { method: 'GET', url: '/doesnotexist.txt', headers: {} }
+  const res = {
+    error: () => t.end(),
     _headers: [],
-    setHeader: function (header) {
+    setHeader: (header) => {
       res._headers.push(header)
     },
-    end: function () {}
+    end: () => {}
   }
   t.plan(2)
-  mount(req, res, function () {
-
+  mount(req, res, () => {
     t.notOk(res._headers.length, 'headers are not set on a non-existant file')
-    req.url='/';
+    req.url = '/'
 
-    mount(req, res, function () {
+    mount(req, res, () => {
       t.notOk(res._headers.length, 'headers are not set with no index')
       t.end()
     })

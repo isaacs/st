@@ -5,22 +5,24 @@
   "main": "st.js",
   "bin": "bin/server.js",
   "dependencies": {
-    "async-cache": "~1.1.0",
-    "bl": "~1.2.1",
+    "async-cache": "^1.1.0",
+    "bl": "^4.0.0",
     "fd": "~0.0.2",
-    "mime": "~1.4.1",
-    "negotiator": "~0.6.1"
+    "mime": "^2.4.4",
+    "negotiator": "~0.6.2"
   },
   "optionalDependencies": {
-    "graceful-fs": "~4.1.11"
+    "graceful-fs": "^4.2.3"
   },
   "devDependencies": {
-    "request": "~2.83.0",
-    "rimraf": "~2.6.2",
-    "tap": "~10.7.2"
+    "request": "^2.88.0",
+    "rimraf": "^3.0.0",
+    "standard": "~14.3.1",
+    "tap": "^14.9.2"
   },
   "scripts": {
-    "test": "tap test/*.js test/cli/*-test.js"
+    "lint": "standard",
+    "test": "npm run lint && tap test/*.js test/cli/*-test.js"
   },
   "repository": {
     "type": "git",

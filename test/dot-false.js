@@ -1,20 +1,18 @@
 global.dot = false
 
-var common = require('./dot-common')
-
-var req = common.req
-var test = common.test
+const { test } = require('tap')
+const { req } = require('./dot-common')
 
 // failing per https://github.com/isaacs/st/issues/67
-test('non-dotted file', function (t) {
-  req('/index.html', function (er, res, body) {
+test('non-dotted file', (t) => {
+  req('/index.html', (er, res, body) => {
     t.equal(res.statusCode, 200)
     t.end()
   })
 })
 
-test('dotted file', function (t) {
-  req('/.index.html', function (er, res, body) {
+test('dotted file', (t) => {
+  req('/.index.html', (er, res, body) => {
     t.equal(res.statusCode, 403)
     t.end()
   })
