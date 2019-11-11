@@ -1,5 +1,7 @@
 # st
 
+[![Travis Status](https://api.travis-ci.org/isaacs/st.svg?branch=master)](https://travis-ci.org/isaacs/st)
+
 A module for serving static files.  Does etags, caching, etc.
 
 ## USAGE
@@ -9,8 +11,8 @@ Here are some very simple usage examples.
 Just serve the files in the cwd at the root of the http server url:
 
 ```javascript
-var st = require('st')
-var http = require('http')
+const st = require('st')
+const http = require('http')
 
 http.createServer(
   st(process.cwd())
@@ -22,9 +24,11 @@ Serve the files in static under the /static url.  Otherwise do a
 different thing:
 
 ```javascript
-var mount = st({ path: __dirname + '/static', url: '/static' })
-http.createServer(function(req, res) {
-  var stHandled = mount(req, res);
+const path = require('path')
+const mount = st({ path: path.join(__dirname, '/static'), url: '/static' })
+
+http.createServer((req, res) => {
+  const stHandled = mount(req, res)
   if (stHandled)
     return
   else
@@ -35,11 +39,11 @@ http.createServer(function(req, res) {
 The same sort of thing, but using an express middleware style:
 
 ```javascript
-var mount = st({ path: __dirname + '/static', url: '/static' })
-http.createServer(function(req, res) {
-  mount(req, res, function() {
-    res.end('this is not a static file')
-  })
+const path = require('path')
+const mount = st({ path: path.join(__dirname, '/static'), url: '/static' })
+
+http.createServer((req, res) => {
+  mount(req, res, () => res.end('this is not a static file'))
 }).listen(1339)
 ```
 
@@ -48,8 +52,10 @@ Serve the files in static under the / url, but only if not some doing
 other thing:
 
 ```javascript
-var mount = st({ path: __dirname + '/static', url: '/' })
-http.createServer(function(req, res) {
+const path = require('path')
+const mount = st({ path: path.join(__dirname, '/static'), url: '/' })
+
+http.createServer((req, res) => {
   if (shouldDoThing(req)) {
     doTheThing(req, res)
   } else {
@@ -62,12 +68,12 @@ Serve the files in static under the / url, but don't serve a 404 if
 the file isn't found, so that the rest of the app can handle it:
 
 ```javascript
-var mount = st({ path: __dirname + '/static', url: '/', passthrough: true })
-http.createServer(function(req, res) {
-  mount(req, res, function() {
-    res.end('this is not a static file');
-  });
-}).listen(1341);
+const path = require('path')
+const mount = st({ path: path.join(__dirname, '/static'), url: '/', passthrough: true})
+
+http.createServer((req, res) => {
+  mount(req, res, () => res.end('this is not a static file'))
+}).listen(1341)
 ```
 
 Serve the files with
@@ -106,8 +112,8 @@ Here are all the options described with their defaults values and a
 few possible settings you might choose to use:
 
 ```javascript
-var st = require('st')
-var mount = st({
+const st = require('st')
+const mount = st({
   path: 'resources/static/', // resolved against the process cwd
   url: 'static/', // defaults to '/'
 
@@ -160,7 +166,7 @@ var mount = st({
 })
 
 // with bare node.js
-http.createServer(function (req, res) {
+http.createServer((req, res) => {
   if (mount(req, res)) return // serving a static file
   myCustomLogic(req, res)
 }).listen(PORT)
@@ -168,7 +174,7 @@ http.createServer(function (req, res) {
 // with express
 app.use(mount)
 // or
-app.route('/static/:fooblz', function (req, res, next) {
+app.route('/static/:fooblz', (req, res, next) => {
   mount(req, res, next) // will call next() if it doesn't do anything
 })
 ```
