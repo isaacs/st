@@ -30,7 +30,7 @@ test('setup', (t) => {
       res.statusCode = 404
       return res.end(`Not a match: ${req.url}`)
     }
-  }).listen(() => {
+  }).listen(0, '127.0.0.1', () => {
     t.pass('listening')
     address = server.address()
     t.end()

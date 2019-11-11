@@ -1,15 +1,14 @@
-var os = require('os')
-var tap = require('tap')
-var test = tap.test
-var common = require('./common')
-var serve = common.serve
+const os = require('os')
+let { test, fail, comment } = require('tap')
+const { serve } = require('./common')
+const port = 1338
 
-var otherAddress = (() => {
-  var ifaces = os.networkInterfaces()
-  for (var iface in ifaces) {
-    var addrs = ifaces[iface]
-    for (var i = 0; i < addrs.length; ++i) {
-      var addr = addrs[i].address
+const otherAddress = (() => {
+  const ifaces = os.networkInterfaces()
+  for (const iface in ifaces) {
+    const addrs = ifaces[iface]
+    for (let i = 0; i < addrs.length; ++i) {
+      const addr = addrs[i].address
       if (/^127\./.test(addr) || /^::1$/.test(addr)) { // loopback device
         continue
       }
@@ -22,17 +21,17 @@ var otherAddress = (() => {
   return null
 })()
 if (!otherAddress) {
-  tap.fail('No non-loopback network address found', { skip: true })
+  fail('No non-loopback network address found', { skip: true })
   test = () => {}
 } else {
-  tap.comment('Using ' + otherAddress + ' as non-localhost address')
+  comment('Using ' + otherAddress + ' as non-localhost address')
 }
 
 function addr2url (addr, path) {
   if (/:/.test(addr)) {
     addr = '[' + addr + ']'
   }
-  addr = 'http://' + addr + ':' + common.port
+  addr = 'http://' + addr + ':' + port
   if (path) {
     addr += path
   }
@@ -41,7 +40,7 @@ function addr2url (addr, path) {
 
 function testServer (name, args, addr, canConnect, cannotConnect) {
   test(name, (t) => {
-    serve(args, (req) => {
+    serve(args.concat(['--port', port]), (req) => {
       canConnect.forEach(checkConnections(t, req, true))
       cannotConnect.forEach(checkConnections(t, req, false))
     }, (err, stdout, stderr) => {
@@ -57,7 +56,7 @@ function testServer (name, args, addr, canConnect, cannotConnect) {
 
 function checkConnections (t, req, canConnect) {
   return (addr) => {
-    var url = addr2url(addr, '/st.js')
+    const url = addr2url(addr, '/st.js')
     req(url, (er, res, body) => {
       if (canConnect) {
         t.ifError(er, url) && t.equal(res.statusCode, 200, url)

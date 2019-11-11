@@ -1,13 +1,12 @@
-const test = require('tap').test
-const common = require('./common')
-const serve = common.serve
+const { test } = require('tap')
+const { serve, stExpect } = require('./common')
 
 test('Basic cli operation', (t) => {
   serve([], (req) => {
     req('/st.js', (er, res, body) => {
       t.ifError(er) &&
       t.equal(res.statusCode, 200) &&
-      t.equal(body.toString(), common.stExpect)
+      t.equal(body.toString(), stExpect)
     })
   }, (er, stdout, stderr) => {
     t.ifError(er)
@@ -22,7 +21,7 @@ test('Listening on localhost only', (t) => {
     req('/st.js', (er, res, body) => {
       t.ifError(er) &&
       t.equal(res.statusCode, 200) &&
-      t.equal(body.toString(), common.stExpect)
+      t.equal(body.toString(), stExpect)
     })
   }, (er, stdout, stderr) => {
     t.ifError(er)

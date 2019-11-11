@@ -49,7 +49,7 @@ test('setup', (t) => {
       console.error(e)
       return res.end(`Internal error: ${e.message}`)
     }
-  }).listen(() => {
+  }).listen(0, '127.0.0.1', () => {
     t.pass('listening')
     address = server.address()
     t.end()
