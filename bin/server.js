@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const st = require('../st.js')
 const http = require('http')
+const { STATUS_CODES } = http
 let port = +(process.env.PORT || 1337)
 let host
 let dir = ''
@@ -180,7 +181,7 @@ http.createServer(function (q, s) {
     return
   }
   s.statusCode = 404
-  s.end('not found')
+  s.end(STATUS_CODES[s.statusCode])
 }).listen(port, host, function () {
   const addr = this.address()
   const port = addr.port
