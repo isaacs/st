@@ -13,6 +13,7 @@ const http = require('http')
 const AC = require('async-cache')
 const FD = require('fd')
 const bl = require('bl')
+const { STATUS_CODES } = http
 
 const defaultCacheOptions = {
   fd: {
@@ -251,7 +252,7 @@ class Mount {
     // If we got a 403, then it's explicitly forbidden.
     if (req.sturl === 403 || (!this.opt.dot && (/(^|\/)\./).test(req.sturl))) {
       res.statusCode = 403
-      res.end('Forbidden')
+      res.end(STATUS_CODES[res.statusCode])
       return true
     }
 
@@ -358,7 +359,7 @@ class Mount {
     }
 
     res.setHeader('content-type', 'text/plain')
-    res.end(http.STATUS_CODES[res.statusCode] + '\n')
+    res.end(STATUS_CODES[res.statusCode] + '\n')
   }
 
   index (p, req, res) {
