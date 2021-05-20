@@ -1,5 +1,5 @@
 const st = require('../st.js')
-const { test, tearDown } = require('tap')
+const { test, teardown } = require('tap')
 const path = require('path')
 const http = require('http')
 const request = require('request')
@@ -42,7 +42,7 @@ test('setup', (t) => {
   })
 })
 
-tearDown(() => {
+teardown(() => {
   server.close()
 })
 
