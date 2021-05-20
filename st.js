@@ -115,8 +115,10 @@ class Mount {
     this.opt = opt
     this.url = opt.url
     this.path = opt.path
-    this._index = opt.index === false ? false
-      : typeof opt.index === 'string' ? opt.index
+    this._index = opt.index === false
+      ? false
+      : typeof opt.index === 'string'
+        ? opt.index
         : true
     this.fdman = FD()
 
@@ -348,9 +350,12 @@ class Mount {
   }
 
   error (er, res) {
-    res.statusCode = typeof er === 'number' ? er
-      : er.code === 'ENOENT' || er.code === 'EISDIR' ? 404
-        : er.code === 'EPERM' || er.code === 'EACCES' ? 403
+    res.statusCode = typeof er === 'number'
+      ? er
+      : er.code === 'ENOENT' || er.code === 'EISDIR'
+        ? 404
+        : er.code === 'EPERM' || er.code === 'EACCES'
+          ? 403
           : 500
 
     if (typeof res.error === 'function') {
@@ -560,10 +565,14 @@ class Mount {
         return ['<a href="' + linkName + '">' + showName + '</a>',
           d.mtime, d.size, showName]
       }).sort((a, b) => {
-        return a[2] === '-' && b[2] !== '-' ? -1 // dirs first
-          : a[2] !== '-' && b[2] === '-' ? 1
-            : a[0].toLowerCase() < b[0].toLowerCase() ? -1 // then alpha
-              : a[0].toLowerCase() > b[0].toLowerCase() ? 1
+        return a[2] === '-' && b[2] !== '-' // dirs first
+          ? -1
+          : a[2] !== '-' && b[2] === '-'
+            ? 1
+            : a[0].toLowerCase() < b[0].toLowerCase() // then alpha
+              ? -1
+              : a[0].toLowerCase() > b[0].toLowerCase()
+                ? 1
                 : 0
       }).forEach((line) => {
         const namePad = new Array(8 + nameLen - line[3].length).join(' ')

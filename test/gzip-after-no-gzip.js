@@ -25,7 +25,7 @@ test('gzips second response', (t) => {
     t.equal(res.headers['x-from-cache'], 'true')
 
     t.ok(body, 'returned a body')
-    t.notEqual(body.toString(), stExpect, 'gzipped string')
+    t.not(body.toString(), stExpect, 'gzipped string')
 
     zlib.gunzip(body, (er, body) => {
       if (er) {

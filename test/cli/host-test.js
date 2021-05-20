@@ -44,7 +44,7 @@ function testServer (name, args, addr, canConnect, cannotConnect) {
       canConnect.forEach(checkConnections(t, req, true))
       cannotConnect.forEach(checkConnections(t, req, false))
     }, (err, stdout, stderr) => {
-      t.ifError(err)
+      t.error(err)
       t.equal(stderr, '')
       if (addr) {
         t.equal(stdout, 'listening at ' + addr2url(addr) + '\n')
@@ -59,7 +59,7 @@ function checkConnections (t, req, canConnect) {
     const url = addr2url(addr, '/st.js')
     req(url, (er, res, body) => {
       if (canConnect) {
-        t.ifError(er, url) && t.equal(res.statusCode, 200, url)
+        t.error(er, url) && t.equal(res.statusCode, 200, url)
       } else {
         t.ok(er, url)
       }

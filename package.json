@@ -6,18 +6,18 @@
   "bin": "bin/server.js",
   "dependencies": {
     "async-cache": "^1.1.0",
-    "bl": "^4.0.0",
-    "fd": "~0.0.2",
-    "mime": "^2.4.4",
+    "bl": "^5.0.0",
+    "fd": "~0.0.3",
+    "mime": "^2.5.2",
     "negotiator": "~0.6.2"
   },
   "optionalDependencies": {
     "graceful-fs": "^4.2.3"
   },
   "devDependencies": {
-    "request": "^2.88.0",
-    "rimraf": "^3.0.0",
-    "standard": "^14.3.1",
+    "request": "^2.88.2",
+    "rimraf": "^3.0.2",
+    "standard": "^16.0.3",
     "tap": "^15.0.9"
   },
   "scripts": {
