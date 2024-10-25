@@ -90,7 +90,7 @@ test('setup middleware server', function (t) {
       })
     })
   })
-  middlewareServer.listen(port, '127.0.0.1', function () {
+  middlewareServer.listen(port, 'localhost', function () {
     t.pass('listening')
     t.end()
   })
@@ -103,7 +103,7 @@ test('setup regular server', function (t) {
       return res.end(`Not a match: ${req.url}`)
     }
   })
-  server.listen(port + 1, '127.0.0.1', function () {
+  server.listen(port + 1, 'localhost', function () {
     t.pass('listening')
     t.end()
   })
@@ -114,6 +114,7 @@ const stExpect = fs.readFileSync(require.resolve('../st.js')).toString()
 
 test('/test/st.js', function (t) {
   req('/test/st.js', function (er, res, body) {
+    t.error(er)
     t.equal(res.statusCode, 200)
     t.ok(res.headers.etag)
     stEtag = res.headers.etag

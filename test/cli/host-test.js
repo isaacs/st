@@ -1,4 +1,5 @@
 const os = require('os')
+const dns = require('dns')
 let { test, fail, comment } = require('tap')
 const { serve } = require('./common')
 const port = 1338
@@ -74,12 +75,6 @@ testServer(
 )
 
 testServer(
-  'Restricted to localhost',
-  ['--localhost'], 'localhost',
-  ['127.0.0.1', 'localhost'], [otherAddress]
-)
-
-testServer(
   'Restricted to non-local host',
   ['--host', otherAddress], otherAddress,
   [otherAddress], ['127.0.0.1']
@@ -90,3 +85,14 @@ testServer(
   ['--host', '127.0.0.1'], '127.0.0.1',
   ['127.0.0.1'], ['::1']
 )
+
+dns.lookup('localhost', (err, address) => {
+  if (err) {
+    throw err
+  }
+  testServer(
+    'Restricted to localhost',
+    ['--localhost'], 'localhost',
+    [address, 'localhost'], [otherAddress]
+  )
+})
