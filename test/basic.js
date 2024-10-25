@@ -97,6 +97,14 @@ test('multiball!', (t) => {
   }
 })
 
+test('trailing slash', (t) => {
+  req('/test/test/fixtures/', (er, res, body) => {
+    t.equal(res.statusCode, 200)
+    t.ok(/<html>.*Index of \/test\/fixtures<[\s\S]+index\.html[\s\S]+space in filename\.txt[\s\S]+<\/html>/.test(body.toString()))
+    t.end()
+  })
+})
+
 test('space in filename', (t) => {
   req('/test/test/fixtures/space in filename.txt', (er, res, body) => {
     t.equal(res.statusCode, 200)
