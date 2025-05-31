@@ -12,7 +12,10 @@ test('does not gzip first response', (t) => {
     t.notOk(res.headers['content-encoding'])
     t.notOk(res.headers['x-from-cache'])
     t.equal(body.toString(), stExpect)
-    t.end()
+    // response is delivered before cache is set, so we'll give it a tiny bit
+    // of grace to close out on the server side before starting the next
+    // test
+    setTimeout(t.end, 100)
   })
 })
 
