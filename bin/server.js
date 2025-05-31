@@ -82,6 +82,7 @@ for (let i = 2; i < process.argv.length; i++) {
     case '--help':
       help()
       process.exit(0)
+      break
 
     case '-nc':
     case '--no-cache':
@@ -150,9 +151,9 @@ if (isNaN(port)) {
 
 const opt = {
   path: dir,
-  url: url,
-  index: index,
-  dot: dot,
+  url,
+  index,
+  dot,
   cache: {
     fd: {},
     stat: {},
@@ -160,7 +161,7 @@ const opt = {
     readdir: {},
     content: {}
   },
-  cors: cors
+  cors
 }
 
 if (cache === false) {

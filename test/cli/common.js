@@ -91,8 +91,8 @@ function serve (args, cbRequests, cbDone) {
     ++thingsToDo
     request({
       encoding: null,
-      url: url,
-      headers: headers
+      url,
+      headers
     }, (...args) => {
       try {
         cb.apply(null, args)

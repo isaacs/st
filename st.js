@@ -1,6 +1,5 @@
 const mime = require('mime')
 const path = require('path')
-const url = require('url')
 let fs
 try {
   fs = require('graceful-fs')
@@ -180,22 +179,13 @@ class Mount {
 
   // get the path component from a URI
   getUriPath (u) {
-    let p = url.parse(u).pathname // eslint-disable-line
+    let p = new URL(u, 'http://base').pathname
 
-    // Encoded dots are dots
-    p = p.replace(/%2e/ig, '.')
+    // Convert any backslashes to forward slashes (for consistency)
+    p = p.replace(/\\/g, '/')
 
-    // encoded slashes are /
-    p = p.replace(/%2f|%5c/ig, '/')
-
-    // back slashes are slashes
-    p = p.replace(/[/\\]/g, '/')
-
-    // Make sure it starts with a slash
-    p = p.replace(/^\//, '/')
+    // Remove the redundant leading slash replacement - URL().pathname always starts with /
     if ((/[/\\]\.\.([/\\]|$)/).test(p)) {
-      // traversal urls not ever even slightly allowed. clearly shenanigans
-      // send a 403 on that noise, do not pass go, do not collect $200
       return 403
     }
 
@@ -204,15 +194,18 @@ class Mount {
       return false
     }
 
+    // URL constructor already decoded, but we might need additional decoding
+    // for edge cases. Only do it if it would actually change something.
     try {
-      u = decodeURIComponent(u)
+      const decoded = decodeURIComponent(u)
+      if (decoded !== u) {
+        u = decoded
+      }
     } catch (e) {
-      // if decodeURIComponent failed, we weren't given a valid URL to begin with.
+    // if decodeURIComponent failed, we weren't given a valid URL to begin with.
       return false
     }
 
-    // /a/b/c mounted on /path/to/z/d/x
-    // /a/b/c/d --> /path/to/z/d/x/d
     u = u.substr(this.url.length)
     if (u.charAt(0) !== '/') {
       u = '/' + u
@@ -445,7 +438,7 @@ class Mount {
   }
 
   streamFile (p, fd, stat, etag, req, res, end) {
-    const streamOpt = { fd: fd, start: 0, end: stat.size }
+    const streamOpt = { fd, start: 0, end: stat.size }
     let stream = fs.createReadStream(p, streamOpt)
     stream.destroy = () => {}
 
@@ -457,7 +450,7 @@ class Mount {
 
     // need a gzipped version for the cache, so do it regardless of what the client wants
     if (gz || (gzOpt && cachable)) {
-      gzstr = zlib.Gzip()
+      gzstr = zlib.createGzip()
     }
 
     // too late to effectively handle any errors.
