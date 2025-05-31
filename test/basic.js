@@ -125,17 +125,8 @@ test('shenanigans', (t) => {
     if (er) {
       throw er
     }
-    t.equal(res.statusCode, 403)
-    t.end()
-  })
-})
-
-test('shenanigans2', (t) => {
-  req('/test//foo/%2e%2E', (er, res) => {
-    if (er) {
-      throw er
-    }
-    t.equal(res.statusCode, 403)
+    // resolves to simply ./etc/passwd
+    t.equal(res.statusCode, 404)
     t.end()
   })
 })

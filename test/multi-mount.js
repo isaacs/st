@@ -47,13 +47,13 @@ function req (url, headers, cb) {
   request({
     encoding: null,
     url: `http://localhost:${port}${url}`,
-    headers: headers,
+    headers,
     agentOptions: { maxSockets: 50 }
   }, next)
   request({
     encoding: null,
     url: `http://localhost:${(port + 1)}${url}`,
-    headers: headers,
+    headers,
     agentOptions: { maxSockets: 50 }
   }, next)
 
@@ -76,7 +76,7 @@ function req (url, headers, cb) {
       assert.strictEqual(`${body}`, `${prev.body}`)
       return cb(er, res, body)
     }
-    prev = { res: res, body: body }
+    prev = { res, body }
   }
 }
 

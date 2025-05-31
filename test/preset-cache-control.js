@@ -23,7 +23,7 @@ function req (url, headers, cb) {
   request({
     encoding: null,
     url: 'http://localhost:' + port + url,
-    headers: headers
+    headers
   }, cb)
 }
 

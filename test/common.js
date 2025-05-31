@@ -32,7 +32,7 @@ function req (url, headers, cb) {
   request({
     encoding: null,
     url: `http://${host}:${address.port}${url}`,
-    headers: headers,
+    headers,
     followRedirect: false
   }, cb)
 }
