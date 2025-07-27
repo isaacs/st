@@ -9,7 +9,7 @@ try {
 const zlib = require('zlib')
 const Neg = require('negotiator')
 const http = require('http')
-const AC = require('async-cache')
+const { LRUCache } = require('lru-cache')
 const FD = require('fd')
 const bl = require('bl')
 const { STATUS_CODES } = http
@@ -17,26 +17,31 @@ const { STATUS_CODES } = http
 const defaultCacheOptions = {
   fd: {
     max: 1000,
-    maxAge: 1000 * 60 * 60
+    maxAge: 1000 * 60 * 60,
+    ignoreFetchAbort: true
   },
   stat: {
     max: 5000,
-    maxAge: 1000 * 60
+    maxAge: 1000 * 60,
+    ignoreFetchAbort: true
   },
   content: {
-    max: 1024 * 1024 * 64,
-    length: (n) => n.length,
-    maxAge: 1000 * 60 * 10
+    maxSize: 1024 * 1024 * 64,
+    sizeCalculation: (n) => n.length,
+    maxAge: 1000 * 60 * 10,
+    ignoreFetchAbort: true
   },
   index: {
-    max: 1024 * 8,
-    length: (n) => n.length,
-    maxAge: 1000 * 60 * 10
+    maxSize: 1024 * 8,
+    sizeCalculation: (n) => n.length,
+    maxAge: 1000 * 60 * 10,
+    ignoreFetchAbort: true
   },
   readdir: {
-    max: 1000,
-    length: (n) => n.length,
-    maxAge: 1000 * 60 * 10
+    maxSize: 1000,
+    sizeCalculation: (n) => Object.keys(n).length,
+    maxAge: 1000 * 60 * 10,
+    ignoreFetchAbort: true
   }
 }
 
@@ -44,8 +49,8 @@ const defaultCacheOptions = {
 // everything is really big.  kind of a kludge, but easiest way
 // to get it done
 const none = {
-  max: 1,
-  length: () => Infinity
+  maxSize: 1,
+  sizeCalculation: () => Number.MAX_SAFE_INTEGER
 }
 
 const noCaching = {
@@ -99,6 +104,24 @@ function st (opt) {
   return fn
 }
 
+const callbackToPromise = fun =>
+  key =>
+    new Promise((resolve, reject) =>
+      fun(key, (err, result) => {
+        if (err) {
+          reject(err)
+        } else {
+          resolve(result)
+        }
+      })
+    )
+
+const promiseToCallback = (promise, cb) =>
+  promise.then(
+    result => cb(null, result),
+    error => cb(error)
+  )
+
 class Mount {
   constructor (opt) {
     if (!opt) {
@@ -124,11 +147,11 @@ class Mount {
     // cache basically everything
     const c = this.getCacheOptions(opt)
     this.cache = {
-      fd: AC(c.fd),
-      stat: AC(c.stat),
-      index: AC(c.index),
-      readdir: AC(c.readdir),
-      content: AC(c.content)
+      fd: new LRUCache(c.fd),
+      stat: new LRUCache(c.stat),
+      index: new LRUCache(c.index),
+      readdir: new LRUCache(c.readdir),
+      content: new LRUCache(c.content)
     }
 
     this._cacheControl =
@@ -158,7 +181,7 @@ class Mount {
     const d = defaultCacheOptions
 
     // should really only ever set max and maxAge here.
-    // load and fd disposal is important to control.
+    // fetchMethod and fd disposal is important to control.
     const c = {
       fd: set('fd'),
       stat: set('stat'),
@@ -167,13 +190,14 @@ class Mount {
       content: set('content')
     }
 
-    c.fd.dispose = this.fdman.close.bind(this.fdman)
-    c.fd.load = this.fdman.open.bind(this.fdman)
+    c.fd.dispose = key => this.fdman.close(key)
+    c.fd.fetchMethod = callbackToPromise((key, cb) => this.fdman.open(key, cb))
 
-    c.stat.load = this._loadStat.bind(this)
-    c.index.load = this._loadIndex.bind(this)
-    c.readdir.load = this._loadReaddir.bind(this)
-    c.content.load = this._loadContent.bind(this)
+    c.stat.fetchMethod = callbackToPromise((key, cb) => this._loadStat(key, cb))
+    c.index.fetchMethod = callbackToPromise((key, cb) => this._loadIndex(key, cb))
+    c.readdir.fetchMethod = callbackToPromise((key, cb) => this._loadReaddir(key, cb))
+    c.content.fetchMethod = callbackToPromise((key, cb) => this._loadContent(key, cb))
+
     return c
   }
 
@@ -202,7 +226,7 @@ class Mount {
         u = decoded
       }
     } catch (e) {
-    // if decodeURIComponent failed, we weren't given a valid URL to begin with.
+      // if decodeURIComponent failed, we weren't given a valid URL to begin with.
       return false
     }
 
@@ -267,7 +291,7 @@ class Mount {
     const p = this.getPath(req.sturl)
 
     // now we have a path.  check for the fd.
-    this.cache.fd.get(p, (er, fd) => {
+    promiseToCallback(this.cache.fd.fetch(p), (er, fd) => {
       // inability to open is some kind of error, probably 404
       // if we're in passthrough, AND got a next function, we can
       // fall through to that.  otherwise, we already returned true,
@@ -285,7 +309,7 @@ class Mount {
       // only perform a single checkin
       const end = this.fdman.checkinfn(p, fd)
 
-      this.cache.stat.get(fd + ':' + p, (er, stat) => {
+      promiseToCallback(this.cache.stat.fetch(fd + ':' + p), (er, stat) => {
         if (er) {
           if (next && this.opt.passthrough === true && this._index === false) {
             return next()
@@ -385,7 +409,7 @@ class Mount {
       return
     }
 
-    this.cache.index.get(p, (er, html) => {
+    promiseToCallback(this.cache.index.fetch(p), (er, html) => {
       if (er) {
         return this.error(er, res)
       }
@@ -418,23 +442,19 @@ class Mount {
     const key = stat.size + ':' + etag
     const gz = this.opt.gzip !== false && getGz(p, req)
 
-    this.cache.content.get(key, (er, content) => {
-      if (er) {
-        return this.error(er, res)
-      }
-      res.statusCode = 200
-      if (this.opt.cachedHeader) {
-        res.setHeader('x-from-cache', 'true')
-      }
-      if (gz && content.gz) {
-        res.setHeader('content-encoding', 'gzip')
-        res.setHeader('content-length', content.gz.length)
-        res.end(content.gz)
-      } else {
-        res.setHeader('content-length', content.length)
-        res.end(content)
-      }
-    })
+    const content = this.cache.content.get(key)
+    res.statusCode = 200
+    if (this.opt.cachedHeader) {
+      res.setHeader('x-from-cache', 'true')
+    }
+    if (gz && content.gz) {
+      res.setHeader('content-encoding', 'gzip')
+      res.setHeader('content-length', content.gz.length)
+      res.end(content.gz)
+    } else {
+      res.setHeader('content-length', content.length)
+      res.end(content)
+    }
   }
 
   streamFile (p, fd, stat, etag, req, res, end) {
@@ -445,7 +465,7 @@ class Mount {
     // gzip only if not explicitly turned off or client doesn't accept it
     const gzOpt = this.opt.gzip !== false
     const gz = gzOpt && getGz(p, req)
-    const cachable = this.cache.content._cache.max > stat.size
+    const cachable = this.cache.content.maxSize > stat.size
     let gzstr
 
     // need a gzipped version for the cache, so do it regardless of what the client wants
@@ -530,7 +550,7 @@ class Mount {
       '<h1>Index of ' + t + '</h1>' +
       '<hr><pre><a href="../">../</a>\n'
 
-    this.cache.readdir.get(p, (er, data) => {
+    promiseToCallback(this.cache.readdir.fetch(p), (er, data) => {
       if (er) {
         return cb(er)
       }
@@ -574,8 +594,8 @@ class Mount {
         const namePad = new Array(8 + nameLen - line[3].length).join(' ')
         const sizePad = new Array(8 + sizeLen - ('' + line[2]).length).join(' ')
         str += line[0] + namePad +
-              line[1].toISOString() +
-              sizePad + line[2] + '\n'
+          line[1].toISOString() +
+          sizePad + line[2] + '\n'
       })
 
       str += '</pre><hr></body></html>'
@@ -601,7 +621,7 @@ class Mount {
       data = {}
       files.forEach((file) => {
         const pf = path.join(p, file)
-        this.cache.stat.get(pf, (er, stat) => {
+        promiseToCallback(this.cache.stat.fetch(pf), (er, stat) => {
           if (er) {
             return cb(er)
           }
@@ -639,11 +659,11 @@ class Mount {
     }
   }
 
-  _loadContent () {
+  _loadContent (_, cb) {
     // this function should never be called.
     // we check if the thing is in the cache, and if not, stream it in
-    // manually.  this.cache.content.get() should not ever happen.
-    throw new Error('This should not ever happen')
+    // manually.  this.cache.content.fetch() should not ever happen.
+    return cb(new Error('This should never happen'))
   }
 }
 
