@@ -116,12 +116,6 @@ const callbackToPromise = fun =>
       })
     )
 
-const promiseToCallback = (promise, cb) =>
-  promise.then(
-    result => cb(null, result),
-    error => cb(error)
-  )
-
 class Mount {
   constructor (opt) {
     if (!opt) {
@@ -192,7 +186,12 @@ class Mount {
 
     c.fd.dispose = key => this.fdman.close(key)
     c.fd.fetchMethod = callbackToPromise((key, cb) => this.fdman.open(key, cb))
+    // c.fd.fetchMethod = promisify((key, cb) => this.fdman.open(key, cb))
 
+    // c.stat.fetchMethod = promisify((key, cb) => this._loadStat(key, cb))
+    // c.index.fetchMethod = promisify((key, cb) => this._loadIndex(key, cb))
+    // c.readdir.fetchMethod = promisify((key, cb) => this._loadReaddir(key, cb))
+    // c.content.fetchMethod = promisify((key, cb) => this._loadContent(key, cb))
     c.stat.fetchMethod = callbackToPromise((key, cb) => this._loadStat(key, cb))
     c.index.fetchMethod = callbackToPromise((key, cb) => this._loadIndex(key, cb))
     c.readdir.fetchMethod = callbackToPromise((key, cb) => this._loadReaddir(key, cb))
@@ -291,80 +290,82 @@ class Mount {
     const p = this.getPath(req.sturl)
 
     // now we have a path.  check for the fd.
-    promiseToCallback(this.cache.fd.fetch(p), (er, fd) => {
-      // inability to open is some kind of error, probably 404
-      // if we're in passthrough, AND got a next function, we can
-      // fall through to that.  otherwise, we already returned true,
-      // send an error.
-      if (er) {
+    this.cache.fd.fetch(p).then(
+      fd => {
+        // we may be about to use this, so don't let it be closed by cache purge
+        this.fdman.checkout(p, fd)
+        // a safe end() function that can be called multiple times but
+        // only perform a single checkin
+        const end = this.fdman.checkinfn(p, fd)
+
+        this.cache.stat.fetch(fd + ':' + p).then(
+          stat => {
+            const isDirectory = stat.isDirectory()
+
+            if (isDirectory) {
+              end() // we won't need this fd for a directory in any case
+              if (next && this.opt.passthrough === true && this._index === false) {
+                // this is done before if-modified-since and if-non-match checks so
+                // cached modified and etag values won't return 304's if we've since
+                // switched to !index. See Issue #51.
+                return next()
+              }
+            }
+
+            let ims = req.headers['if-modified-since']
+            if (ims) {
+              ims = new Date(ims).getTime()
+            }
+            if (ims && ims >= stat.mtime.getTime()) {
+              res.statusCode = 304
+              res.end()
+              return end()
+            }
+
+            const etag = getEtag(stat)
+            if (req.headers['if-none-match'] === etag) {
+              res.statusCode = 304
+              res.end()
+              return end()
+            }
+
+            // only set headers once we're sure we'll be serving this request
+            if (!res.getHeader('cache-control') && this._cacheControl) {
+              res.setHeader('cache-control', this._cacheControl)
+            }
+            res.setHeader('last-modified', stat.mtime.toUTCString())
+            res.setHeader('etag', etag)
+
+            if (this.opt.cors) {
+              res.setHeader('Access-Control-Allow-Origin', '*')
+              res.setHeader('Access-Control-Allow-Headers',
+                'Origin, X-Requested-With, Content-Type, Accept, Range')
+            }
+
+            return isDirectory
+              ? this.index(p, req, res)
+              : this.file(p, fd, stat, etag, req, res, end)
+          },
+          er => {
+            if (next && this.opt.passthrough === true && this._index === false) {
+              return next()
+            }
+            end()
+            return this.error(er, res)
+          }
+        )
+      },
+      er => {
+        // inability to open is some kind of error, probably 404
+        // if we're in passthrough, AND got a next function, we can
+        // fall through to that.  otherwise, we already returned true,
+        // send an error.
         if (this.opt.passthrough === true && er.code === 'ENOENT' && next) {
           return next()
         }
         return this.error(er, res)
       }
-
-      // we may be about to use this, so don't let it be closed by cache purge
-      this.fdman.checkout(p, fd)
-      // a safe end() function that can be called multiple times but
-      // only perform a single checkin
-      const end = this.fdman.checkinfn(p, fd)
-
-      promiseToCallback(this.cache.stat.fetch(fd + ':' + p), (er, stat) => {
-        if (er) {
-          if (next && this.opt.passthrough === true && this._index === false) {
-            return next()
-          }
-          end()
-          return this.error(er, res)
-        }
-
-        const isDirectory = stat.isDirectory()
-
-        if (isDirectory) {
-          end() // we won't need this fd for a directory in any case
-          if (next && this.opt.passthrough === true && this._index === false) {
-            // this is done before if-modified-since and if-non-match checks so
-            // cached modified and etag values won't return 304's if we've since
-            // switched to !index. See Issue #51.
-            return next()
-          }
-        }
-
-        let ims = req.headers['if-modified-since']
-        if (ims) {
-          ims = new Date(ims).getTime()
-        }
-        if (ims && ims >= stat.mtime.getTime()) {
-          res.statusCode = 304
-          res.end()
-          return end()
-        }
-
-        const etag = getEtag(stat)
-        if (req.headers['if-none-match'] === etag) {
-          res.statusCode = 304
-          res.end()
-          return end()
-        }
-
-        // only set headers once we're sure we'll be serving this request
-        if (!res.getHeader('cache-control') && this._cacheControl) {
-          res.setHeader('cache-control', this._cacheControl)
-        }
-        res.setHeader('last-modified', stat.mtime.toUTCString())
-        res.setHeader('etag', etag)
-
-        if (this.opt.cors) {
-          res.setHeader('Access-Control-Allow-Origin', '*')
-          res.setHeader('Access-Control-Allow-Headers',
-            'Origin, X-Requested-With, Content-Type, Accept, Range')
-        }
-
-        return isDirectory
-          ? this.index(p, req, res)
-          : this.file(p, fd, stat, etag, req, res, end)
-      })
-    })
+    )
 
     return true
   }
@@ -409,16 +410,16 @@ class Mount {
       return
     }
 
-    promiseToCallback(this.cache.index.fetch(p), (er, html) => {
-      if (er) {
-        return this.error(er, res)
-      }
-
-      res.statusCode = 200
-      res.setHeader('content-type', 'text/html')
-      res.setHeader('content-length', html.length)
-      res.end(html)
-    })
+    // promiseToCallback(this.cache.index.fetch(p), (er, html) => {
+    this.cache.index.fetch(p).then(
+      html => {
+        res.statusCode = 200
+        res.setHeader('content-type', 'text/html')
+        res.setHeader('content-length', html.length)
+        res.end(html)
+      },
+      er => this.error(er, res)
+    )
   }
 
   file (p, fd, stat, etag, req, res, end) {
@@ -550,57 +551,56 @@ class Mount {
       '<h1>Index of ' + t + '</h1>' +
       '<hr><pre><a href="../">../</a>\n'
 
-    promiseToCallback(this.cache.readdir.fetch(p), (er, data) => {
-      if (er) {
-        return cb(er)
-      }
+    this.cache.readdir.fetch(p).then(
+      data => {
+        let nameLen = 0
+        let sizeLen = 0
 
-      let nameLen = 0
-      let sizeLen = 0
+        Object.keys(data).map((f) => {
+          const d = data[f]
 
-      Object.keys(data).map((f) => {
-        const d = data[f]
+          let name = f
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/'/g, '&#39;')
 
-        let name = f
-          .replace(/"/g, '&quot;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/'/g, '&#39;')
+          if (d.size === '-') {
+            name += '/'
+          }
+          const showName = name.replace(/^(.{40}).{3,}$/, '$1..>')
+          const linkName = encodeURIComponent(name)
+            .replace(/%2e/ig, '.') // Encoded dots are dots
+            .replace(/%2f|%5c/ig, '/') // encoded slashes are /
+            .replace(/[/\\]/g, '/') // back slashes are slashes
 
-        if (d.size === '-') {
-          name += '/'
-        }
-        const showName = name.replace(/^(.{40}).{3,}$/, '$1..>')
-        const linkName = encodeURIComponent(name)
-          .replace(/%2e/ig, '.') // Encoded dots are dots
-          .replace(/%2f|%5c/ig, '/') // encoded slashes are /
-          .replace(/[/\\]/g, '/') // back slashes are slashes
+          nameLen = Math.max(nameLen, showName.length)
+          sizeLen = Math.max(sizeLen, ('' + d.size).length)
+          return ['<a href="' + linkName + '">' + showName + '</a>',
+            d.mtime, d.size, showName]
+        }).sort((a, b) => {
+          return a[2] === '-' && b[2] !== '-' // dirs first
+            ? -1
+            : a[2] !== '-' && b[2] === '-'
+              ? 1
+              : a[0].toLowerCase() < b[0].toLowerCase() // then alpha
+                ? -1
+                : a[0].toLowerCase() > b[0].toLowerCase()
+                  ? 1
+                  : 0
+        }).forEach((line) => {
+          const namePad = new Array(8 + nameLen - line[3].length).join(' ')
+          const sizePad = new Array(8 + sizeLen - ('' + line[2]).length).join(' ')
+          str += line[0] + namePad +
+            line[1].toISOString() +
+            sizePad + line[2] + '\n'
+        })
 
-        nameLen = Math.max(nameLen, showName.length)
-        sizeLen = Math.max(sizeLen, ('' + d.size).length)
-        return ['<a href="' + linkName + '">' + showName + '</a>',
-          d.mtime, d.size, showName]
-      }).sort((a, b) => {
-        return a[2] === '-' && b[2] !== '-' // dirs first
-          ? -1
-          : a[2] !== '-' && b[2] === '-'
-            ? 1
-            : a[0].toLowerCase() < b[0].toLowerCase() // then alpha
-              ? -1
-              : a[0].toLowerCase() > b[0].toLowerCase()
-                ? 1
-                : 0
-      }).forEach((line) => {
-        const namePad = new Array(8 + nameLen - line[3].length).join(' ')
-        const sizePad = new Array(8 + sizeLen - ('' + line[2]).length).join(' ')
-        str += line[0] + namePad +
-          line[1].toISOString() +
-          sizePad + line[2] + '\n'
-      })
-
-      str += '</pre><hr></body></html>'
-      cb(null, Buffer.from(str))
-    })
+        str += '</pre><hr></body></html>'
+        cb(null, Buffer.from(str))
+      },
+      er => cb(er)
+    )
   }
 
   _loadReaddir (p, cb) {
@@ -621,16 +621,16 @@ class Mount {
       data = {}
       files.forEach((file) => {
         const pf = path.join(p, file)
-        promiseToCallback(this.cache.stat.fetch(pf), (er, stat) => {
-          if (er) {
-            return cb(er)
-          }
-          if (stat.isDirectory()) {
-            stat.size = '-'
-          }
-          data[file] = stat
-          next()
-        })
+        this.cache.stat.fetch(pf).then(
+          stat => {
+            if (stat.isDirectory()) {
+              stat.size = '-'
+            }
+            data[file] = stat
+            next()
+          },
+          er => cb(er)
+        )
       })
     })
 

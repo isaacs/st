@@ -9,8 +9,7 @@
     "bl": "^6.1.0",
     "fd": "^0.0.3",
     "mime": "^3.0.0",
-    "negotiator": "^1.0.0",
-    "promisify": "^0.0.3"
+    "negotiator": "^1.0.0"
   },
   "optionalDependencies": {
     "graceful-fs": "^4.2.3"
