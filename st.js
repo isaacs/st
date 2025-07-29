@@ -104,18 +104,6 @@ function st (opt) {
   return fn
 }
 
-const callbackToPromise = fun =>
-  key =>
-    new Promise((resolve, reject) =>
-      fun(key, (err, result) => {
-        if (err) {
-          reject(err)
-        } else {
-          resolve(result)
-        }
-      })
-    )
-
 class Mount {
   constructor (opt) {
     if (!opt) {
@@ -185,17 +173,12 @@ class Mount {
     }
 
     c.fd.dispose = key => this.fdman.close(key)
-    c.fd.fetchMethod = callbackToPromise((key, cb) => this.fdman.open(key, cb))
-    // c.fd.fetchMethod = promisify((key, cb) => this.fdman.open(key, cb))
+    c.fd.fetchMethod = key => new Promise((resolve, reject) => this.fdman.open(key, (err, fd) => err ? reject(err) : resolve(fd)))
 
-    // c.stat.fetchMethod = promisify((key, cb) => this._loadStat(key, cb))
-    // c.index.fetchMethod = promisify((key, cb) => this._loadIndex(key, cb))
-    // c.readdir.fetchMethod = promisify((key, cb) => this._loadReaddir(key, cb))
-    // c.content.fetchMethod = promisify((key, cb) => this._loadContent(key, cb))
-    c.stat.fetchMethod = callbackToPromise((key, cb) => this._loadStat(key, cb))
-    c.index.fetchMethod = callbackToPromise((key, cb) => this._loadIndex(key, cb))
-    c.readdir.fetchMethod = callbackToPromise((key, cb) => this._loadReaddir(key, cb))
-    c.content.fetchMethod = callbackToPromise((key, cb) => this._loadContent(key, cb))
+    c.stat.fetchMethod = key => new Promise((resolve, reject) => this._loadStat(key, (err, fd) => err ? reject(err) : resolve(fd)))
+    c.index.fetchMethod = key => new Promise((resolve, reject) => this._loadIndex(key, (err, fd) => err ? reject(err) : resolve(fd)))
+    c.readdir.fetchMethod = key => new Promise((resolve, reject) => this._loadReaddir(key, (err, fd) => err ? reject(err) : resolve(fd)))
+    c.content.fetchMethod = key => new Promise((resolve, reject) => this._loadContent(key, (err, fd) => err ? reject(err) : resolve(fd)))
 
     return c
   }
