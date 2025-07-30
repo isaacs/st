@@ -393,7 +393,6 @@ class Mount {
       return
     }
 
-    // promiseToCallback(this.cache.index.fetch(p), (er, html) => {
     this.cache.index.fetch(p).then(
       (html) => {
         res.statusCode = 200
