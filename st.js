@@ -172,13 +172,13 @@ class Mount {
       content: set('content')
     }
 
-    c.fd.dispose = key => this.fdman.close(key)
-    c.fd.fetchMethod = key => new Promise((resolve, reject) => this.fdman.open(key, (err, fd) => err ? reject(err) : resolve(fd)))
+    c.fd.dispose = (key) => this.fdman.close(key)
+    c.fd.fetchMethod = (key) => new Promise((resolve, reject) => this.fdman.open(key, (err, fd) => err ? reject(err) : resolve(fd)))
 
-    c.stat.fetchMethod = key => new Promise((resolve, reject) => this._loadStat(key, (err, fd) => err ? reject(err) : resolve(fd)))
-    c.index.fetchMethod = key => new Promise((resolve, reject) => this._loadIndex(key, (err, fd) => err ? reject(err) : resolve(fd)))
-    c.readdir.fetchMethod = key => new Promise((resolve, reject) => this._loadReaddir(key, (err, fd) => err ? reject(err) : resolve(fd)))
-    c.content.fetchMethod = key => new Promise((resolve, reject) => this._loadContent(key, (err, fd) => err ? reject(err) : resolve(fd)))
+    c.stat.fetchMethod = (key) => new Promise((resolve, reject) => this._loadStat(key, (err, fd) => err ? reject(err) : resolve(fd)))
+    c.index.fetchMethod = (key) => new Promise((resolve, reject) => this._loadIndex(key, (err, fd) => err ? reject(err) : resolve(fd)))
+    c.readdir.fetchMethod = (key) => new Promise((resolve, reject) => this._loadReaddir(key, (err, fd) => err ? reject(err) : resolve(fd)))
+    c.content.fetchMethod = (key) => new Promise((resolve, reject) => this._loadContent(key, (err, fd) => err ? reject(err) : resolve(fd)))
 
     return c
   }
@@ -274,7 +274,7 @@ class Mount {
 
     // now we have a path.  check for the fd.
     this.cache.fd.fetch(p).then(
-      fd => {
+      (fd) => {
         // we may be about to use this, so don't let it be closed by cache purge
         this.fdman.checkout(p, fd)
         // a safe end() function that can be called multiple times but
@@ -282,7 +282,7 @@ class Mount {
         const end = this.fdman.checkinfn(p, fd)
 
         this.cache.stat.fetch(fd + ':' + p).then(
-          stat => {
+          (stat) => {
             const isDirectory = stat.isDirectory()
 
             if (isDirectory) {
@@ -329,7 +329,7 @@ class Mount {
               ? this.index(p, req, res)
               : this.file(p, fd, stat, etag, req, res, end)
           },
-          er => {
+          (er) => {
             if (next && this.opt.passthrough === true && this._index === false) {
               return next()
             }
@@ -338,7 +338,7 @@ class Mount {
           }
         )
       },
-      er => {
+      (er) => {
         // inability to open is some kind of error, probably 404
         // if we're in passthrough, AND got a next function, we can
         // fall through to that.  otherwise, we already returned true,
@@ -395,13 +395,13 @@ class Mount {
 
     // promiseToCallback(this.cache.index.fetch(p), (er, html) => {
     this.cache.index.fetch(p).then(
-      html => {
+      (html) => {
         res.statusCode = 200
         res.setHeader('content-type', 'text/html')
         res.setHeader('content-length', html.length)
         res.end(html)
       },
-      er => this.error(er, res)
+      (er) => this.error(er, res)
     )
   }
 
@@ -535,7 +535,7 @@ class Mount {
       '<hr><pre><a href="../">../</a>\n'
 
     this.cache.readdir.fetch(p).then(
-      data => {
+      (data) => {
         let nameLen = 0
         let sizeLen = 0
 
@@ -582,7 +582,7 @@ class Mount {
         str += '</pre><hr></body></html>'
         cb(null, Buffer.from(str))
       },
-      er => cb(er)
+      (er) => cb(er)
     )
   }
 
@@ -605,14 +605,14 @@ class Mount {
       files.forEach((file) => {
         const pf = path.join(p, file)
         this.cache.stat.fetch(pf).then(
-          stat => {
+          (stat) => {
             if (stat.isDirectory()) {
               stat.size = '-'
             }
             data[file] = stat
             next()
           },
-          er => cb(er)
+          (er) => cb(er)
         )
       })
     })
