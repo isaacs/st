@@ -9,7 +9,7 @@ try {
 const zlib = require('zlib')
 const Neg = require('negotiator')
 const http = require('http')
-const AC = require('async-cache')
+const { LRUCache } = require('lru-cache')
 const FD = require('fd')
 const bl = require('bl')
 const { STATUS_CODES } = http
@@ -17,26 +17,31 @@ const { STATUS_CODES } = http
 const defaultCacheOptions = {
   fd: {
     max: 1000,
-    maxAge: 1000 * 60 * 60
+    maxAge: 1000 * 60 * 60,
+    ignoreFetchAbort: true
   },
   stat: {
     max: 5000,
-    maxAge: 1000 * 60
+    maxAge: 1000 * 60,
+    ignoreFetchAbort: true
   },
   content: {
-    max: 1024 * 1024 * 64,
-    length: (n) => n.length,
-    maxAge: 1000 * 60 * 10
+    maxSize: 1024 * 1024 * 64,
+    sizeCalculation: (n) => n.length,
+    maxAge: 1000 * 60 * 10,
+    ignoreFetchAbort: true
   },
   index: {
-    max: 1024 * 8,
-    length: (n) => n.length,
-    maxAge: 1000 * 60 * 10
+    maxSize: 1024 * 8,
+    sizeCalculation: (n) => n.length,
+    maxAge: 1000 * 60 * 10,
+    ignoreFetchAbort: true
   },
   readdir: {
-    max: 1000,
-    length: (n) => n.length,
-    maxAge: 1000 * 60 * 10
+    maxSize: 1000,
+    sizeCalculation: (n) => Object.keys(n).length,
+    maxAge: 1000 * 60 * 10,
+    ignoreFetchAbort: true
   }
 }
 
@@ -44,8 +49,8 @@ const defaultCacheOptions = {
 // everything is really big.  kind of a kludge, but easiest way
 // to get it done
 const none = {
-  max: 1,
-  length: () => Infinity
+  maxSize: 1,
+  sizeCalculation: () => Number.MAX_SAFE_INTEGER
 }
 
 const noCaching = {
@@ -124,11 +129,11 @@ class Mount {
     // cache basically everything
     const c = this.getCacheOptions(opt)
     this.cache = {
-      fd: AC(c.fd),
-      stat: AC(c.stat),
-      index: AC(c.index),
-      readdir: AC(c.readdir),
-      content: AC(c.content)
+      fd: new LRUCache(c.fd),
+      stat: new LRUCache(c.stat),
+      index: new LRUCache(c.index),
+      readdir: new LRUCache(c.readdir),
+      content: new LRUCache(c.content)
     }
 
     this._cacheControl =
@@ -158,7 +163,7 @@ class Mount {
     const d = defaultCacheOptions
 
     // should really only ever set max and maxAge here.
-    // load and fd disposal is important to control.
+    // fetchMethod and fd disposal is important to control.
     const c = {
       fd: set('fd'),
       stat: set('stat'),
@@ -167,13 +172,14 @@ class Mount {
       content: set('content')
     }
 
-    c.fd.dispose = this.fdman.close.bind(this.fdman)
-    c.fd.load = this.fdman.open.bind(this.fdman)
+    c.fd.dispose = (key) => this.fdman.close(key)
+    c.fd.fetchMethod = (key) => new Promise((resolve, reject) => this.fdman.open(key, (err, fd) => err ? reject(err) : resolve(fd)))
 
-    c.stat.load = this._loadStat.bind(this)
-    c.index.load = this._loadIndex.bind(this)
-    c.readdir.load = this._loadReaddir.bind(this)
-    c.content.load = this._loadContent.bind(this)
+    c.stat.fetchMethod = (key) => new Promise((resolve, reject) => this._loadStat(key, (err, fd) => err ? reject(err) : resolve(fd)))
+    c.index.fetchMethod = (key) => new Promise((resolve, reject) => this._loadIndex(key, (err, fd) => err ? reject(err) : resolve(fd)))
+    c.readdir.fetchMethod = (key) => new Promise((resolve, reject) => this._loadReaddir(key, (err, fd) => err ? reject(err) : resolve(fd)))
+    c.content.fetchMethod = (key) => new Promise((resolve, reject) => this._loadContent(key, (err, fd) => err ? reject(err) : resolve(fd)))
+
     return c
   }
 
@@ -202,7 +208,7 @@ class Mount {
         u = decoded
       }
     } catch (e) {
-    // if decodeURIComponent failed, we weren't given a valid URL to begin with.
+      // if decodeURIComponent failed, we weren't given a valid URL to begin with.
       return false
     }
 
@@ -267,80 +273,82 @@ class Mount {
     const p = this.getPath(req.sturl)
 
     // now we have a path.  check for the fd.
-    this.cache.fd.get(p, (er, fd) => {
-      // inability to open is some kind of error, probably 404
-      // if we're in passthrough, AND got a next function, we can
-      // fall through to that.  otherwise, we already returned true,
-      // send an error.
-      if (er) {
+    this.cache.fd.fetch(p).then(
+      (fd) => {
+        // we may be about to use this, so don't let it be closed by cache purge
+        this.fdman.checkout(p, fd)
+        // a safe end() function that can be called multiple times but
+        // only perform a single checkin
+        const end = this.fdman.checkinfn(p, fd)
+
+        this.cache.stat.fetch(fd + ':' + p).then(
+          (stat) => {
+            const isDirectory = stat.isDirectory()
+
+            if (isDirectory) {
+              end() // we won't need this fd for a directory in any case
+              if (next && this.opt.passthrough === true && this._index === false) {
+                // this is done before if-modified-since and if-non-match checks so
+                // cached modified and etag values won't return 304's if we've since
+                // switched to !index. See Issue #51.
+                return next()
+              }
+            }
+
+            let ims = req.headers['if-modified-since']
+            if (ims) {
+              ims = new Date(ims).getTime()
+            }
+            if (ims && ims >= stat.mtime.getTime()) {
+              res.statusCode = 304
+              res.end()
+              return end()
+            }
+
+            const etag = getEtag(stat)
+            if (req.headers['if-none-match'] === etag) {
+              res.statusCode = 304
+              res.end()
+              return end()
+            }
+
+            // only set headers once we're sure we'll be serving this request
+            if (!res.getHeader('cache-control') && this._cacheControl) {
+              res.setHeader('cache-control', this._cacheControl)
+            }
+            res.setHeader('last-modified', stat.mtime.toUTCString())
+            res.setHeader('etag', etag)
+
+            if (this.opt.cors) {
+              res.setHeader('Access-Control-Allow-Origin', '*')
+              res.setHeader('Access-Control-Allow-Headers',
+                'Origin, X-Requested-With, Content-Type, Accept, Range')
+            }
+
+            return isDirectory
+              ? this.index(p, req, res)
+              : this.file(p, fd, stat, etag, req, res, end)
+          },
+          (er) => {
+            if (next && this.opt.passthrough === true && this._index === false) {
+              return next()
+            }
+            end()
+            return this.error(er, res)
+          }
+        )
+      },
+      (er) => {
+        // inability to open is some kind of error, probably 404
+        // if we're in passthrough, AND got a next function, we can
+        // fall through to that.  otherwise, we already returned true,
+        // send an error.
         if (this.opt.passthrough === true && er.code === 'ENOENT' && next) {
           return next()
         }
         return this.error(er, res)
       }
-
-      // we may be about to use this, so don't let it be closed by cache purge
-      this.fdman.checkout(p, fd)
-      // a safe end() function that can be called multiple times but
-      // only perform a single checkin
-      const end = this.fdman.checkinfn(p, fd)
-
-      this.cache.stat.get(fd + ':' + p, (er, stat) => {
-        if (er) {
-          if (next && this.opt.passthrough === true && this._index === false) {
-            return next()
-          }
-          end()
-          return this.error(er, res)
-        }
-
-        const isDirectory = stat.isDirectory()
-
-        if (isDirectory) {
-          end() // we won't need this fd for a directory in any case
-          if (next && this.opt.passthrough === true && this._index === false) {
-            // this is done before if-modified-since and if-non-match checks so
-            // cached modified and etag values won't return 304's if we've since
-            // switched to !index. See Issue #51.
-            return next()
-          }
-        }
-
-        let ims = req.headers['if-modified-since']
-        if (ims) {
-          ims = new Date(ims).getTime()
-        }
-        if (ims && ims >= stat.mtime.getTime()) {
-          res.statusCode = 304
-          res.end()
-          return end()
-        }
-
-        const etag = getEtag(stat)
-        if (req.headers['if-none-match'] === etag) {
-          res.statusCode = 304
-          res.end()
-          return end()
-        }
-
-        // only set headers once we're sure we'll be serving this request
-        if (!res.getHeader('cache-control') && this._cacheControl) {
-          res.setHeader('cache-control', this._cacheControl)
-        }
-        res.setHeader('last-modified', stat.mtime.toUTCString())
-        res.setHeader('etag', etag)
-
-        if (this.opt.cors) {
-          res.setHeader('Access-Control-Allow-Origin', '*')
-          res.setHeader('Access-Control-Allow-Headers',
-            'Origin, X-Requested-With, Content-Type, Accept, Range')
-        }
-
-        return isDirectory
-          ? this.index(p, req, res)
-          : this.file(p, fd, stat, etag, req, res, end)
-      })
-    })
+    )
 
     return true
   }
@@ -385,16 +393,15 @@ class Mount {
       return
     }
 
-    this.cache.index.get(p, (er, html) => {
-      if (er) {
-        return this.error(er, res)
-      }
-
-      res.statusCode = 200
-      res.setHeader('content-type', 'text/html')
-      res.setHeader('content-length', html.length)
-      res.end(html)
-    })
+    this.cache.index.fetch(p).then(
+      (html) => {
+        res.statusCode = 200
+        res.setHeader('content-type', 'text/html')
+        res.setHeader('content-length', html.length)
+        res.end(html)
+      },
+      (er) => this.error(er, res)
+    )
   }
 
   file (p, fd, stat, etag, req, res, end) {
@@ -418,23 +425,19 @@ class Mount {
     const key = stat.size + ':' + etag
     const gz = this.opt.gzip !== false && getGz(p, req)
 
-    this.cache.content.get(key, (er, content) => {
-      if (er) {
-        return this.error(er, res)
-      }
-      res.statusCode = 200
-      if (this.opt.cachedHeader) {
-        res.setHeader('x-from-cache', 'true')
-      }
-      if (gz && content.gz) {
-        res.setHeader('content-encoding', 'gzip')
-        res.setHeader('content-length', content.gz.length)
-        res.end(content.gz)
-      } else {
-        res.setHeader('content-length', content.length)
-        res.end(content)
-      }
-    })
+    const content = this.cache.content.get(key)
+    res.statusCode = 200
+    if (this.opt.cachedHeader) {
+      res.setHeader('x-from-cache', 'true')
+    }
+    if (gz && content.gz) {
+      res.setHeader('content-encoding', 'gzip')
+      res.setHeader('content-length', content.gz.length)
+      res.end(content.gz)
+    } else {
+      res.setHeader('content-length', content.length)
+      res.end(content)
+    }
   }
 
   streamFile (p, fd, stat, etag, req, res, end) {
@@ -445,7 +448,7 @@ class Mount {
     // gzip only if not explicitly turned off or client doesn't accept it
     const gzOpt = this.opt.gzip !== false
     const gz = gzOpt && getGz(p, req)
-    const cachable = this.cache.content._cache.max > stat.size
+    const cachable = this.cache.content.maxSize > stat.size
     let gzstr
 
     // need a gzipped version for the cache, so do it regardless of what the client wants
@@ -530,57 +533,56 @@ class Mount {
       '<h1>Index of ' + t + '</h1>' +
       '<hr><pre><a href="../">../</a>\n'
 
-    this.cache.readdir.get(p, (er, data) => {
-      if (er) {
-        return cb(er)
-      }
+    this.cache.readdir.fetch(p).then(
+      (data) => {
+        let nameLen = 0
+        let sizeLen = 0
 
-      let nameLen = 0
-      let sizeLen = 0
+        Object.keys(data).map((f) => {
+          const d = data[f]
 
-      Object.keys(data).map((f) => {
-        const d = data[f]
+          let name = f
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/'/g, '&#39;')
 
-        let name = f
-          .replace(/"/g, '&quot;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/'/g, '&#39;')
+          if (d.size === '-') {
+            name += '/'
+          }
+          const showName = name.replace(/^(.{40}).{3,}$/, '$1..>')
+          const linkName = encodeURIComponent(name)
+            .replace(/%2e/ig, '.') // Encoded dots are dots
+            .replace(/%2f|%5c/ig, '/') // encoded slashes are /
+            .replace(/[/\\]/g, '/') // back slashes are slashes
 
-        if (d.size === '-') {
-          name += '/'
-        }
-        const showName = name.replace(/^(.{40}).{3,}$/, '$1..>')
-        const linkName = encodeURIComponent(name)
-          .replace(/%2e/ig, '.') // Encoded dots are dots
-          .replace(/%2f|%5c/ig, '/') // encoded slashes are /
-          .replace(/[/\\]/g, '/') // back slashes are slashes
+          nameLen = Math.max(nameLen, showName.length)
+          sizeLen = Math.max(sizeLen, ('' + d.size).length)
+          return ['<a href="' + linkName + '">' + showName + '</a>',
+            d.mtime, d.size, showName]
+        }).sort((a, b) => {
+          return a[2] === '-' && b[2] !== '-' // dirs first
+            ? -1
+            : a[2] !== '-' && b[2] === '-'
+              ? 1
+              : a[0].toLowerCase() < b[0].toLowerCase() // then alpha
+                ? -1
+                : a[0].toLowerCase() > b[0].toLowerCase()
+                  ? 1
+                  : 0
+        }).forEach((line) => {
+          const namePad = new Array(8 + nameLen - line[3].length).join(' ')
+          const sizePad = new Array(8 + sizeLen - ('' + line[2]).length).join(' ')
+          str += line[0] + namePad +
+            line[1].toISOString() +
+            sizePad + line[2] + '\n'
+        })
 
-        nameLen = Math.max(nameLen, showName.length)
-        sizeLen = Math.max(sizeLen, ('' + d.size).length)
-        return ['<a href="' + linkName + '">' + showName + '</a>',
-          d.mtime, d.size, showName]
-      }).sort((a, b) => {
-        return a[2] === '-' && b[2] !== '-' // dirs first
-          ? -1
-          : a[2] !== '-' && b[2] === '-'
-            ? 1
-            : a[0].toLowerCase() < b[0].toLowerCase() // then alpha
-              ? -1
-              : a[0].toLowerCase() > b[0].toLowerCase()
-                ? 1
-                : 0
-      }).forEach((line) => {
-        const namePad = new Array(8 + nameLen - line[3].length).join(' ')
-        const sizePad = new Array(8 + sizeLen - ('' + line[2]).length).join(' ')
-        str += line[0] + namePad +
-              line[1].toISOString() +
-              sizePad + line[2] + '\n'
-      })
-
-      str += '</pre><hr></body></html>'
-      cb(null, Buffer.from(str))
-    })
+        str += '</pre><hr></body></html>'
+        cb(null, Buffer.from(str))
+      },
+      (er) => cb(er)
+    )
   }
 
   _loadReaddir (p, cb) {
@@ -601,16 +603,16 @@ class Mount {
       data = {}
       files.forEach((file) => {
         const pf = path.join(p, file)
-        this.cache.stat.get(pf, (er, stat) => {
-          if (er) {
-            return cb(er)
-          }
-          if (stat.isDirectory()) {
-            stat.size = '-'
-          }
-          data[file] = stat
-          next()
-        })
+        this.cache.stat.fetch(pf).then(
+          (stat) => {
+            if (stat.isDirectory()) {
+              stat.size = '-'
+            }
+            data[file] = stat
+            next()
+          },
+          (er) => cb(er)
+        )
       })
     })
 
@@ -639,11 +641,11 @@ class Mount {
     }
   }
 
-  _loadContent () {
+  _loadContent (_, cb) {
     // this function should never be called.
     // we check if the thing is in the cache, and if not, stream it in
-    // manually.  this.cache.content.get() should not ever happen.
-    throw new Error('This should not ever happen')
+    // manually.  this.cache.content.fetch() should not ever happen.
+    return cb(new Error('This should never happen'))
   }
 }
 

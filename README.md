@@ -129,7 +129,7 @@ const mount = st({
     },
 
     content: {
-      max: 1024*1024*64, // how much memory to use on caching contents
+      maxSize: 1024*1024*64, // how much memory to use on caching contents
       maxAge: 1000 * 60 * 10, // how long to cache contents for
                               // if `false` does not set cache control headers
       cacheControl: 'public, max-age=600' // to set an explicit cache-control
@@ -137,12 +137,12 @@ const mount = st({
     },
 
     index: { // irrelevant if not using index:true
-      max: 1024 * 8, // how many bytes of autoindex html to cache
+      maxSize: 1024 * 8, // how many bytes of autoindex html to cache
       maxAge: 1000 * 60 * 10, // how long to store it for
     },
 
     readdir: { // irrelevant if not using index:true
-      max: 1000, // how many dir entries to cache
+      maxSize: 1000, // how many dir entries to cache
       maxAge: 1000 * 60 * 10, // how long to cache them for
     }
   },
