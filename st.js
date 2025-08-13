@@ -216,9 +216,12 @@ class Mount {
 
   // get a path from a url
   getPath (u) {
-    // Normalise paths by removing trailing slashes
+    // Normalize paths by removing trailing slashes
     // This ensures consistent paths for directory content rendering
-    return path.join(this.path, u.replace(/(?<!\/)\/+$/, ''))
+    while (u.length > 0 && u[u.length - 1] === '/') {
+      u = u.slice(0, -1)
+    }
+    return path.join(this.path, u)
   }
 
   // get a url from a path
