@@ -222,10 +222,12 @@ class Mount {
 
   // get a path from a url
   getPath (u) {
-    // trailing slash removal to fix Node.js v23 bug
-    // https://github.com/nodejs/node/pull/55527
-    // can be removed when this is resolved and released
-    return path.join(this.path, u.replace(/\/+$/, ''))
+    // Normalize paths by removing trailing slashes
+    // This ensures consistent paths for directory content rendering
+    while (u.length > 0 && u[u.length - 1] === '/') {
+      u = u.slice(0, -1)
+    }
+    return path.join(this.path, u)
   }
 
   // get a url from a path
