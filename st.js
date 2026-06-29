@@ -187,28 +187,30 @@ class Mount {
   getUriPath (u) {
     let p = new URL(u, 'http://base').pathname
 
+    // Percent-decode before checking for `..` segments. The URL parser only
+    // resolves dot-segments that appear literally in the pathname, so an
+    // encoded separator (e.g. `/..%2f..%2fsecret`) keeps the `..` hidden and
+    // sails past the traversal check below until it is decoded. Decoding first
+    // means the check, and `path.normalize` after it, see the real path.
+    try {
+      const decoded = decodeURIComponent(p)
+      if (decoded !== p) {
+        p = decoded
+      }
+    } catch (e) {
+      // not a valid url-encoded path, so we can't safely serve it
+      return false
+    }
+
     // Convert any backslashes to forward slashes (for consistency)
     p = p.replace(/\\/g, '/')
 
-    // Remove the redundant leading slash replacement - URL().pathname always starts with /
     if ((/[/\\]\.\.([/\\]|$)/).test(p)) {
       return 403
     }
 
     u = path.normalize(p).replace(/\\/g, '/')
     if (u.indexOf(this.url) !== 0) {
-      return false
-    }
-
-    // URL constructor already decoded, but we might need additional decoding
-    // for edge cases. Only do it if it would actually change something.
-    try {
-      const decoded = decodeURIComponent(u)
-      if (decoded !== u) {
-        u = decoded
-      }
-    } catch (e) {
-      // if decodeURIComponent failed, we weren't given a valid URL to begin with.
       return false
     }
 
