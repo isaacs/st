@@ -1,9 +1,13 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import st from '../st.js'
+import { test } from './support/tap-shim.js'
+
 global.dot = true
 
-const path = require('path')
-const { test } = require('tap')
-const { req } = require('./dot-common')
-const st = require('../st.js')
+const { req } = await import('./support/dot-common.js')
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // A percent-encoded separator must not smuggle a `..` past the traversal
 // guard. `..%2f` (and `..%5c`) only decode to `../` after the path has been

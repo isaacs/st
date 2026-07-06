@@ -1,11 +1,19 @@
-const os = require('os')
-const dns = require('dns')
-let { test, fail, comment } = require('tap')
-const { serve } = require('./common')
+import os from 'node:os'
+import { lookup } from 'node:dns/promises'
+import * as tap from '../support/tap-shim.js'
+import { serve } from '../support/cli-common.js'
+
+let { test, fail, comment } = tap
 const port = 1338
 
 const otherAddress = (() => {
-  const ifaces = os.networkInterfaces()
+  let ifaces
+  try {
+    ifaces = os.networkInterfaces()
+  } catch (er) {
+    comment('networkInterfaces unavailable: ' + er.message)
+    return null
+  }
   for (const iface in ifaces) {
     const addrs = ifaces[iface]
     for (let i = 0; i < addrs.length; ++i) {
@@ -86,13 +94,9 @@ testServer(
   ['127.0.0.1'], ['::1']
 )
 
-dns.lookup('localhost', (err, address) => {
-  if (err) {
-    throw err
-  }
-  testServer(
-    'Restricted to localhost',
-    ['--localhost'], 'localhost',
-    [address, 'localhost'], [otherAddress]
-  )
-})
+const { address } = await lookup('localhost')
+testServer(
+  'Restricted to localhost',
+  ['--localhost'], 'localhost',
+  [address, 'localhost'], [otherAddress]
+)

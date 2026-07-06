@@ -1,7 +1,8 @@
+import { test } from './support/tap-shim.js'
+
 global.dot = false
 
-const { test } = require('tap')
-const { req } = require('./dot-common')
+const { req } = await import('./support/dot-common.js')
 
 // failing per https://github.com/isaacs/st/issues/67
 test('non-dotted file', (t) => {

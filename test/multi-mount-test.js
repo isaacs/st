@@ -1,11 +1,16 @@
-const st = require('../st.js')
-const test = require('tap').test
-const port = process.env.PORT || 1337
-const path = require('path')
-const request = require('request')
-const assert = require('assert')
-const fs = require('fs')
-const http = require('http')
+import path from 'node:path'
+import assert from 'node:assert'
+import fs from 'node:fs'
+import http from 'node:http'
+import { fileURLToPath } from 'node:url'
+import st from '../st.js'
+import FD from 'fd'
+import { test } from './support/tap-shim.js'
+import { request } from './support/http-client.js'
+
+const port = +(process.env.PORT || 1337)
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 let middlewareServer
 let server
@@ -110,7 +115,7 @@ test('setup regular server', function (t) {
 })
 
 let stEtag
-const stExpect = fs.readFileSync(require.resolve('../st.js')).toString()
+const stExpect = fs.readFileSync(fileURLToPath(new URL('../st.js', import.meta.url))).toString()
 
 test('/test/st.js', function (t) {
   req('/test/st.js', function (er, res, body) {
@@ -133,8 +138,8 @@ test('/test/st.js 304', function (t) {
 
 let mmEtag
 const mmExpect = fs.readFileSync(__filename, 'utf8')
-test('/blerg/multi-mount.js', function (t) {
-  req('/blerg/multi-mount.js', function (er, res, body) {
+test('/blerg/multi-mount-test.js', function (t) {
+  req('/blerg/multi-mount-test.js', function (er, res, body) {
     t.equal(res.statusCode, 200)
     t.ok(res.headers.etag)
     mmEtag = res.headers.etag
@@ -143,8 +148,8 @@ test('/blerg/multi-mount.js', function (t) {
   })
 })
 
-test('/test/test/multi-mount.js', function (t) {
-  req('/test/test/multi-mount.js', function (er, res, body) {
+test('/test/test/multi-mount-test.js', function (t) {
+  req('/test/test/multi-mount-test.js', function (er, res, body) {
     t.equal(res.statusCode, 200)
     t.equal(mmEtag, res.headers.etag)
     t.equal(body.toString(), mmExpect)
@@ -198,8 +203,8 @@ test('just get a few more etags', function (t) {
 test('many parallel requests', function (t) {
   const n = 50
   const reqs =
-    [['/test/test/multi-mount.js', mmEtag, mmExpect],
-      ['/blerg/multi-mount.js', mmEtag, mmExpect],
+    [['/test/test/multi-mount-test.js', mmEtag, mmExpect],
+      ['/blerg/multi-mount-test.js', mmEtag, mmExpect],
       ['/test/st.js', stEtag, stExpect],
       ['/test/README.md', rmEtag, rmExpect],
       ['/test/package.json', pjEtag, pjExpect],
@@ -229,7 +234,7 @@ test('many parallel requests', function (t) {
 
       if (--total === 0) {
         process.nextTick(() => {
-          t.ok(require('fd')._totalOpenFds <= 6) // max of 3 fds per mount
+          t.ok(FD._totalOpenFds <= 6) // max of 3 fds per mount
           t.end()
         })
       }

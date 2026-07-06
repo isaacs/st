@@ -1,8 +1,12 @@
-const st = require('../st.js')
-const { test, teardown } = require('tap')
-const path = require('path')
-const http = require('http')
-const request = require('request')
+import path from 'node:path'
+import http from 'node:http'
+import { fileURLToPath } from 'node:url'
+import { test, teardown } from './support/tap-shim.js'
+import { request } from './support/http-client.js'
+import st from '../st.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 const port = process.env.PORT || 1337
 
 const opts = Object.assign({

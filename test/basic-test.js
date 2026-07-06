@@ -1,10 +1,8 @@
-const zlib = require('zlib')
-const { test } = require('tap')
-const { req, stExpect, opts, mount } = require('./common')
+import zlib from 'node:zlib'
+import { test } from './support/tap-shim.js'
+import { req, stExpect, opts, mount } from './support/common.js'
 
-module.exports.req = req
-module.exports.stExpect = stExpect
-module.exports.mount = mount
+export { req, stExpect, mount }
 
 let stEtag
 

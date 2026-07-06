@@ -1,17 +1,19 @@
-const path = require('path')
-const http = require('http')
-const request = require('request')
-const { test, teardown } = require('tap')
-
-const st = require('../st.js')
+import http from 'node:http'
+import { fileURLToPath } from 'node:url'
+import { test, teardown } from './tap-shim.js'
+import { request } from './http-client.js'
+import st from '../../st.js'
 
 let address
 let server
 
+// Several wrapper tests set global.dot/global.url before dynamically importing
+// this helper. Keep option reads at module setup time unless those tests are
+// refactored away from the legacy shared-fixture pattern.
 const opts = {
   dot: global.dot,
   url: global.url,
-  path: path.join(__dirname, 'fixtures', '.dotted-dir')
+  path: fileURLToPath(new URL('../fixtures/.dotted-dir', import.meta.url))
 }
 
 const mount = st(opts)
@@ -42,4 +44,4 @@ teardown(() => {
   server.close()
 })
 
-module.exports.req = req
+export { req }

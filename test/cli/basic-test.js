@@ -1,5 +1,5 @@
-const { test } = require('tap')
-const { serve, stExpect } = require('./common')
+import { test } from '../support/tap-shim.js'
+import { serve, stExpect } from '../support/cli-common.js'
 
 test('Basic cli operation', (t) => {
   serve([], (req) => {

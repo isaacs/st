@@ -1,10 +1,11 @@
+import zlib from 'node:zlib'
+import { test } from './support/tap-shim.js'
+
 global.options = {
   cachedHeader: true // inspect to see if something is served from cache
 }
 
-const zlib = require('zlib')
-const { req, stExpect } = require('./common.js')
-const { test } = require('tap')
+const { req, stExpect } = await import('./support/common.js')
 
 test('does not gzip first response', (t) => {
   req('/test/st.js', { 'accept-encoding': 'none' }, (er, res, body) => {

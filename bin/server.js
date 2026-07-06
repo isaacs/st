@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-const st = require('../st.js')
-const http = require('http')
-const { STATUS_CODES } = http
+import st from '../st.js'
+import { createServer, STATUS_CODES } from 'node:http'
 let port = +(process.env.PORT || 1337)
 let host
 let dir = ''
@@ -177,7 +176,7 @@ if (cache === false) {
 
 const mount = st(opt)
 
-http.createServer(function (q, s) {
+createServer(function (q, s) {
   if (mount(q, s)) {
     return
   }

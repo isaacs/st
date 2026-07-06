@@ -1,9 +1,10 @@
+import { test } from './support/tap-shim.js'
+
 global.options = {
   cors: true
 }
 
-const { test } = require('tap')
-const { req } = require('./common')
+const { req } = await import('./support/common.js')
 
 test('CORS headers', (t) => {
   req('/test/st.js', (er, res) => {

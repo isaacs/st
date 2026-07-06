@@ -1,14 +1,14 @@
-'use strict'
-
-const path = require('path')
-const fs = require('fs')
-const request = require('request')
-const childProcess = require('child_process')
-const bl = require('bl')
+import path from 'node:path'
+import fs from 'node:fs'
+import { spawn } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { request } from './http-client.js'
 
 const port = process.env.PORT || 1337
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
-const stExpect = fs.readFileSync(require.resolve('../../st.js'), 'utf8')
+const stExpect = fs.readFileSync(fileURLToPath(new URL('../../st.js', import.meta.url)), 'utf8')
 
 // Run server with given command line arguments,
 // then allow cbRequests to schedule a bunch of requests,
@@ -16,21 +16,21 @@ const stExpect = fs.readFileSync(require.resolve('../../st.js'), 'utf8')
 // cbRequests gets the req function as an argument.
 
 function serve (args, cbRequests, cbDone) {
-  args = [require.resolve('../../bin/server.js')].concat(args || [])
-  const server = childProcess.spawn(process.execPath, args, {
+  args = [fileURLToPath(new URL('../../bin/server.js', import.meta.url))].concat(args || [])
+  const server = spawn(process.execPath, args, {
     cwd: path.dirname(path.dirname(__dirname)),
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { LANG: 'C', LC_ALL: 'C' }
   })
-  const stdout = bl()
-  const stderr = bl()
-  server.stdout.pipe(stdout)
-  server.stderr.pipe(stderr)
+  const stdout = []
+  const stderr = []
   let thingsToDo = 4 // cbRequests, exit, stdout, stderr
   let code = null
   let signal = null
   let cbReqEr = null
   let outputSeen = false
+  server.stdout.on('data', (chunk) => stdout.push(chunk))
+  server.stderr.on('data', (chunk) => stderr.push(chunk))
   server.once('error', (er) => {
     thingsToDo = -10 // only call cbDone once
     cbDone(er)
@@ -44,8 +44,8 @@ function serve (args, cbRequests, cbDone) {
     }
     then()
   })
-  stdout.once('finish', then)
-  stderr.once('finish', then)
+  server.stdout.once('end', then)
+  server.stderr.once('end', then)
   server.stdout.once('data', () => {
     if (outputSeen) return
     outputSeen = true
@@ -71,7 +71,8 @@ function serve (args, cbRequests, cbDone) {
       } else if (code !== null && code !== 0) {
         er = Error('Exited with code ' + code)
       }
-      const o = stdout.toString(); const e = stderr.toString()
+      const o = Buffer.concat(stdout).toString()
+      const e = Buffer.concat(stderr).toString()
       if (er) {
         console.info(o)
         console.error(e)
@@ -103,6 +104,4 @@ function serve (args, cbRequests, cbDone) {
   }
 }
 
-module.exports.port = port
-module.exports.stExpect = stExpect
-module.exports.serve = serve
+export { port, stExpect, serve }
