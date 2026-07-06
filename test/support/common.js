@@ -1,21 +1,27 @@
-const path = require('path')
-const fs = require('fs')
-const http = require('http')
-const request = require('request')
-const { test, teardown } = require('tap')
+import path from 'node:path'
+import fs from 'node:fs'
+import http from 'node:http'
+import { fileURLToPath } from 'node:url'
+import { test, teardown } from './tap-shim.js'
+import { request } from './http-client.js'
+import st from '../../st.js'
 
-const st = require('../st.js')
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 let address
 let server
 
+// Several wrapper tests set global.options before dynamically importing this
+// helper. Keep option reads at module setup time unless those tests are
+// refactored away from the legacy shared-fixture pattern.
 const opts = Object.assign({
   autoindex: true,
-  path: path.dirname(__dirname),
+  path: path.dirname(path.dirname(__dirname)),
   url: '/test'
 }, global.options || {})
 
-const stExpect = fs.readFileSync(require.resolve('../st.js'), 'utf8')
+const stExpect = fs.readFileSync(fileURLToPath(new URL('../../st.js', import.meta.url)), 'utf8')
 const mount = st(opts)
 
 function req (url, headers, cb) {
@@ -60,7 +66,4 @@ teardown(() => {
   server.close()
 })
 
-module.exports.mount = mount
-module.exports.req = req
-module.exports.stExpect = stExpect
-module.exports.opts = opts
+export { mount, req, stExpect, opts }

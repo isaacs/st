@@ -1,18 +1,78 @@
-const mime = require('mime')
-const path = require('path')
-let fs
+import mime from 'mime'
+import path from 'node:path'
+import fsBuiltin from 'node:fs'
+import zlib from 'node:zlib'
+import { STATUS_CODES } from 'node:http'
+import { createRequire } from 'node:module'
+import Neg from 'negotiator'
+import { LRUCache } from 'lru-cache'
+import FD from 'fd'
+import { BufferListStream } from 'bl'
+
+const require = createRequire(import.meta.url)
+let fs = fsBuiltin
 try {
   fs = require('graceful-fs')
-} catch (e) {
-  fs = require('fs')
+} catch {
+  // graceful-fs is optional.
 }
-const zlib = require('zlib')
-const Neg = require('negotiator')
-const http = require('http')
-const { LRUCache } = require('lru-cache')
-const FD = require('fd')
-const bl = require('bl')
-const { STATUS_CODES } = http
+
+/**
+ * @typedef {object} CacheEntryOptions
+ * @property {number} [max] Maximum number of entries to keep.
+ * @property {number} [maxSize] Maximum calculated cache size.
+ * @property {number | false} [maxAge] Time in milliseconds before entries expire.
+ * @property {(value: unknown, key?: string) => number} [sizeCalculation] Custom entry size calculation.
+ * @property {string} [cacheControl] Explicit Cache-Control response header.
+ */
+
+/**
+ * @typedef {object} CacheOptions
+ * @property {false | CacheEntryOptions} [fd] File descriptor cache options.
+ * @property {false | CacheEntryOptions} [stat] Stat cache options.
+ * @property {false | CacheEntryOptions} [content] File content cache options.
+ * @property {false | CacheEntryOptions} [index] Autoindex HTML cache options.
+ * @property {false | CacheEntryOptions} [readdir] Directory listing cache options.
+ */
+
+/**
+ * @typedef {object} Options
+ * @property {string} path Directory to serve from.
+ * @property {string} [url] URL mount point. Defaults to `/`.
+ * @property {boolean | string} [index] Autoindex, index filename, or false for directory 404s.
+ * @property {boolean} [dot] Allow dotfiles to be served.
+ * @property {boolean | CacheOptions} [cache] Cache controls, or false to disable all caches.
+ * @property {boolean} [passthrough] Call the next handler instead of returning a 404.
+ * @property {boolean} [gzip] Enable gzip when accepted by the client. Defaults to true.
+ * @property {boolean} [cors] Enable permissive CORS headers.
+ * @property {boolean} [cachedHeader] Add an `x-from-cache` header to cached content responses.
+ */
+
+/**
+ * @typedef {import('node:http').IncomingMessage & {
+ *   sturl?: string | number | false,
+ *   negotiator?: { preferredEncoding: (encodings: string[]) => string | undefined }
+ * }} Request
+ */
+
+/**
+ * @typedef {Request & { sturl: string }} ServedRequest
+ */
+
+/**
+ * @typedef {import('node:http').ServerResponse & {
+ *   filter?: NodeJS.ReadWriteStream,
+ *   error?: (statusCode: number, error: unknown) => void
+ * }} Response
+ */
+
+/**
+ * @typedef {(req: Request, res: Response, next?: () => void) => boolean} ServeFunction
+ */
+
+/**
+ * @typedef {ServeFunction & { _this: Mount }} Handler
+ */
 
 const defaultCacheOptions = {
   fd: {
@@ -72,32 +132,45 @@ const noCache = (fetch) => {
   }
 }
 
-function st (opt) {
+/**
+ * Create a static file serving handler.
+ *
+ * @param {string | Options} opt Path to serve, or full options object.
+ * @param {string | Options} [url] Mount URL, or options when the first parameter is a path.
+ * @param {Options} [options] Options when the first two parameters are path and URL.
+ * @returns {Handler}
+ */
+function st (opt, url, options) {
   let p, u
+  /** @type {Options | undefined} */
+  let stOpt
   if (typeof opt === 'string') {
     p = opt
-    opt = arguments[1]
-    if (typeof opt === 'string') {
-      u = opt
-      opt = arguments[2]
+    if (typeof url === 'string') {
+      u = url
+      stOpt = options
+    } else {
+      stOpt = url
     }
+  } else {
+    stOpt = opt
   }
 
-  if (!opt) {
-    opt = {}
+  if (!stOpt) {
+    stOpt = /** @type {Options} */ ({})
   } else {
-    opt = Object.assign({}, opt)
+    stOpt = Object.assign({}, stOpt)
   }
 
   if (!p) {
-    p = opt.path
+    p = stOpt.path
   }
   if (typeof p !== 'string') {
     throw new Error('no path specified')
   }
   p = path.resolve(p)
   if (!u) {
-    u = opt.url
+    u = stOpt.url
   }
   if (!u) {
     u = ''
@@ -106,16 +179,19 @@ function st (opt) {
     u = '/' + u
   }
 
-  opt.url = u
-  opt.path = p
+  stOpt.url = u
+  stOpt.path = p
 
-  const m = new Mount(opt)
-  const fn = m.serve.bind(m)
+  const m = new Mount(stOpt)
+  const fn = /** @type {Handler} */ (m.serve.bind(m))
   fn._this = m
   return fn
 }
 
 class Mount {
+  /**
+   * @param {Options} opt
+   */
   constructor (opt) {
     if (!opt) {
       throw new Error('no options provided')
@@ -123,10 +199,6 @@ class Mount {
     if (typeof opt !== 'object') {
       throw new Error('invalid options')
     }
-    if (!(this instanceof Mount)) {
-      return new Mount(opt)
-    }
-
     this.opt = opt
     this.url = opt.url
     this.path = opt.path
@@ -157,6 +229,9 @@ class Mount {
             : 'public, max-age=' + (c.content.maxAge / 1000)
   }
 
+  /**
+   * @param {Options} opt
+   */
   getCacheOptions (opt) {
     let o = opt.cache
     const set = (key) => {
@@ -195,6 +270,9 @@ class Mount {
   }
 
   // get the path component from a URI
+  /**
+   * @param {string} u
+   */
   getUriPath (u) {
     let p = new URL(u, 'http://base').pathname
 
@@ -235,6 +313,9 @@ class Mount {
   }
 
   // get a path from a url
+  /**
+   * @param {string} u
+   */
   getPath (u) {
     // Normalize paths by removing trailing slashes
     // This ensures consistent paths for directory content rendering
@@ -252,6 +333,9 @@ class Mount {
   }
 
   // get a url from a path
+  /**
+   * @param {string} p
+   */
   getUrl (p) {
     p = path.resolve(p)
     if (p.indexOf(this.path) !== 0) {
@@ -262,6 +346,11 @@ class Mount {
     return u
   }
 
+  /**
+   * @param {Request} req
+   * @param {Response} res
+   * @param {() => void} [next]
+   */
   serve (req, res, next) {
     if (req.method !== 'HEAD' && req.method !== 'GET') {
       if (typeof next === 'function') {
@@ -277,7 +366,7 @@ class Mount {
 
     // don't allow dot-urls by default, unless explicitly allowed.
     // If we got a 403, then it's explicitly forbidden.
-    if (req.sturl === 403 || (!this.opt.dot && (/(^|\/)\./).test(req.sturl))) {
+    if (req.sturl === 403 || (!this.opt.dot && typeof req.sturl === 'string' && (/(^|\/)\./).test(req.sturl))) {
       res.statusCode = 403
       res.end(STATUS_CODES[res.statusCode])
       return true
@@ -293,7 +382,9 @@ class Mount {
       return false
     }
 
-    const p = this.getPath(req.sturl)
+    const sturl = req.sturl
+    const servedReq = /** @type {ServedRequest} */ (req)
+    const p = this.getPath(sturl)
     if (p === 403) {
       res.statusCode = 403
       res.end(STATUS_CODES[res.statusCode])
@@ -323,10 +414,8 @@ class Mount {
               }
             }
 
-            let ims = req.headers['if-modified-since']
-            if (ims) {
-              ims = new Date(ims).getTime()
-            }
+            const imsHeader = req.headers['if-modified-since']
+            const ims = imsHeader ? new Date(String(imsHeader)).getTime() : 0
             if (ims && ims >= stat.mtime.getTime()) {
               res.statusCode = 304
               res.end()
@@ -354,7 +443,7 @@ class Mount {
             }
 
             return isDirectory
-              ? this.index(p, req, res)
+              ? this.index(p, servedReq, res)
               : this.file(p, fd, stat, etag, req, res, end)
           },
           (er) => {
@@ -381,6 +470,10 @@ class Mount {
     return true
   }
 
+  /**
+   * @param {NodeJS.ErrnoException | number} er
+   * @param {Response} res
+   */
   error (er, res) {
     res.statusCode = typeof er === 'number'
       ? er
@@ -399,6 +492,11 @@ class Mount {
     res.end(STATUS_CODES[res.statusCode] + '\n')
   }
 
+  /**
+   * @param {string} p
+   * @param {ServedRequest} req
+   * @param {Response} res
+   */
   index (p, req, res) {
     if (this._index === true) {
       return this.autoindex(p, req, res)
@@ -413,6 +511,11 @@ class Mount {
     return this.error(404, res)
   }
 
+  /**
+   * @param {string} p
+   * @param {ServedRequest} req
+   * @param {Response} res
+   */
   autoindex (p, req, res) {
     if (!/\/$/.exec(req.sturl)) {
       res.statusCode = 301
@@ -432,6 +535,15 @@ class Mount {
     )
   }
 
+  /**
+   * @param {string} p
+   * @param {number} fd
+   * @param {import('node:fs').Stats} stat
+   * @param {string} etag
+   * @param {Request} req
+   * @param {Response} res
+   * @param {() => void} end
+   */
   file (p, fd, stat, etag, req, res, end) {
     const key = stat.size + ':' + etag
 
@@ -449,6 +561,13 @@ class Mount {
     }
   }
 
+  /**
+   * @param {string} p
+   * @param {import('node:fs').Stats} stat
+   * @param {string} etag
+   * @param {Request} req
+   * @param {Response} res
+   */
   cachedFile (p, stat, etag, req, res) {
     const key = stat.size + ':' + etag
     const gz = this.opt.gzip !== false && getGz(p, req)
@@ -468,10 +587,20 @@ class Mount {
     }
   }
 
+  /**
+   * @param {string} p
+   * @param {number} fd
+   * @param {import('node:fs').Stats} stat
+   * @param {string} etag
+   * @param {Request} req
+   * @param {Response} res
+   * @param {() => void} end
+   */
   streamFile (p, fd, stat, etag, req, res, end) {
     const streamOpt = { fd, start: 0, end: stat.size }
-    let stream = fs.createReadStream(p, streamOpt)
-    stream.destroy = () => {}
+    const sourceStream = fs.createReadStream(p, streamOpt)
+    sourceStream.destroy = () => sourceStream
+    let stream = /** @type {NodeJS.ReadableStream} */ (sourceStream)
 
     // gzip only if not explicitly turned off or client doesn't accept it
     const gzOpt = this.opt.gzip !== false
@@ -523,20 +652,20 @@ class Mount {
       // caching gzipped data
       const collectEnd = () => {
         if (++calls === (gzOpt ? 2 : 1)) {
-          const content = bufs.slice()
+          const content = /** @type {Buffer & { gz?: Buffer }} */ (bufs.slice())
           content.gz = gzbufs && gzbufs.slice()
           this.cache.content.set(key, content)
         }
       }
 
       const key = stat.size + ':' + etag
-      const bufs = bl(collectEnd)
+      const bufs = new BufferListStream(collectEnd)
       let gzbufs
 
       stream.pipe(bufs)
 
       if (gzstr) {
-        gzbufs = bl(collectEnd)
+        gzbufs = new BufferListStream(collectEnd)
         gzstr.pipe(gzbufs)
       }
     }
@@ -544,6 +673,10 @@ class Mount {
 
   // cache-fillers
 
+  /**
+   * @param {string} p
+   * @param {(error: NodeJS.ErrnoException | null, data?: Buffer) => void} cb
+   */
   _loadIndex (p, cb) {
     // truncate off the first bits
     const url = p.substr(this.path.length).replace(/\\/g, '/')
@@ -613,6 +746,10 @@ class Mount {
     )
   }
 
+  /**
+   * @param {string} p
+   * @param {(error: NodeJS.ErrnoException | null, data?: Record<string, import('node:fs').Stats>) => void} cb
+   */
   _loadReaddir (p, cb) {
     let len
     let data
@@ -651,6 +788,10 @@ class Mount {
     }
   }
 
+  /**
+   * @param {string} key
+   * @param {(error: NodeJS.ErrnoException | null, data?: import('node:fs').Stats) => void} cb
+   */
   _loadStat (key, cb) {
     // key is either fd:path or just a path
     const fdp = key.match(/^(\d+):(.*)/)
@@ -669,6 +810,10 @@ class Mount {
     }
   }
 
+  /**
+   * @param {string} _
+   * @param {(error: Error) => void} cb
+   */
   _loadContent (_, cb) {
     // this function should never be called.
     // we check if the thing is in the cache, and if not, stream it in
@@ -677,10 +822,17 @@ class Mount {
   }
 }
 
+/**
+ * @param {import('node:fs').Stats} s
+ */
 function getEtag (s) {
   return '"' + s.dev + '-' + s.ino + '-' + s.mtime.getTime() + '"'
 }
 
+/**
+ * @param {string} p
+ * @param {Request} req
+ */
 function getGz (p, req) {
   let gz = false
   if (!/\.t?gz$/.exec(p)) {
@@ -690,5 +842,5 @@ function getGz (p, req) {
   return gz
 }
 
-module.exports = st
-module.exports.Mount = Mount
+export { Mount }
+export default st

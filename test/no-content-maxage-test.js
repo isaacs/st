@@ -1,8 +1,10 @@
 global.options = {
   cache: {
-    fd: false
+    content: {
+      maxAge: false
+    }
   }
 }
 
 // otherwise just the same as basic.
-require('./basic.js')
+await import('./basic-test.js')

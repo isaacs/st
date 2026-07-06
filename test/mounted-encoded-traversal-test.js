@@ -1,8 +1,9 @@
+import { test } from './support/tap-shim.js'
+
 global.dot = true
 global.url = '/static'
 
-const { test } = require('tap')
-const { req } = require('./dot-common')
+const { req } = await import('./support/dot-common.js')
 
 // Non-root mounts need a segment-boundary check before stripping the mount
 // prefix. Otherwise `/static..%2fsecret` can pass validation as

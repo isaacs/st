@@ -2,27 +2,50 @@
   "name": "st",
   "version": "3.0.4",
   "description": "A module for serving static files.  Does etags, caching, etc.",
+  "type": "module",
   "main": "st.js",
+  "types": "types/st.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/st.d.ts",
+      "import": "./st.js"
+    }
+  },
   "bin": "bin/server.js",
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
-    "lru-cache": "^11.1.0",
-    "bl": "^6.1.0",
+    "lru-cache": "^11.5.1",
+    "bl": "^7.0.5",
     "fd": "^0.0.3",
-    "mime": "^3.0.0",
+    "mime": "^4.1.0",
     "negotiator": "^1.0.0"
   },
   "optionalDependencies": {
     "graceful-fs": "^4.2.3"
   },
   "devDependencies": {
-    "request": "^2.88.2",
-    "rimraf": "^3.0.2",
-    "standard": "^17.1.2",
-    "tap": "^15.2.3"
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "12.0.8",
+    "@semantic-release/npm": "^13.1.5",
+    "@semantic-release/release-notes-generator": "^14.1.1",
+    "@types/node": "^26.1.0",
+    "conventional-changelog-conventionalcommits": "10.2.0",
+    "eslint": "9.39.4",
+    "neostandard": "^0.13.0",
+    "semantic-release": "^25.0.5",
+    "typescript": "^6.0.3"
   },
   "scripts": {
-    "lint": "standard",
-    "test": "npm run lint && tap test/*.js test/cli/*-test.js --no-coverage"
+    "build": "npm run build:types",
+    "build:types": "tsc --project tsconfig.json",
+    "lint": "eslint .",
+    "prepublishOnly": "npm run build",
+    "test": "npm run lint && npm run test:unit",
+    "test:unit": "node --test --test-concurrency=1 \"test/**/*-test.js\""
   },
   "repository": {
     "type": "git",
@@ -37,5 +60,86 @@
     "cache"
   ],
   "author": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
-  "license": "ISC"
+  "license": "ISC",
+  "release": {
+    "branches": [
+      "master"
+    ],
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "preset": "conventionalcommits",
+          "releaseRules": [
+            {
+              "breaking": true,
+              "release": "major"
+            },
+            {
+              "revert": true,
+              "release": "patch"
+            },
+            {
+              "type": "feat",
+              "release": "minor"
+            },
+            {
+              "type": "fix",
+              "release": "patch"
+            },
+            {
+              "type": "chore",
+              "release": "patch"
+            },
+            {
+              "type": "docs",
+              "release": "patch"
+            },
+            {
+              "type": "test",
+              "release": "patch"
+            },
+            {
+              "scope": "no-release",
+              "release": false
+            }
+          ]
+        }
+      ],
+      [
+        "@semantic-release/release-notes-generator",
+        {
+          "preset": "conventionalcommits",
+          "presetConfig": {
+            "types": [
+              {
+                "type": "feat",
+                "section": "Features"
+              },
+              {
+                "type": "fix",
+                "section": "Bug Fixes"
+              },
+              {
+                "type": "chore",
+                "section": "Trivial Changes"
+              },
+              {
+                "type": "docs",
+                "section": "Trivial Changes"
+              },
+              {
+                "type": "test",
+                "section": "Tests"
+              }
+            ]
+          }
+        }
+      ],
+      "@semantic-release/changelog",
+      "@semantic-release/npm",
+      "@semantic-release/github",
+      "@semantic-release/git"
+    ]
+  }
 }

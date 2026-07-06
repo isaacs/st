@@ -1,10 +1,11 @@
+import { test } from './support/tap-shim.js'
+
 // turn off gzip compression
 global.options = {
   gzip: false
 }
 
-const { test } = require('tap')
-const { req, stExpect } = require('./basic.js')
+const { req, stExpect } = await import('./basic-test.js')
 
 // additional test to ensure that it's actually not gzipping
 

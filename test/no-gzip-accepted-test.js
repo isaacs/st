@@ -1,12 +1,12 @@
-global.options = {
-}
+import fs from 'node:fs'
+import path from 'node:path'
+import crypto from 'node:crypto'
+import { fileURLToPath } from 'node:url'
+import { test } from './support/tap-shim.js'
+import { req } from './support/common.js'
 
-const fs = require('fs')
-const path = require('path')
-const crypto = require('crypto')
-const rimraf = require('rimraf')
-const { test } = require('tap')
-const { req } = require('./common.js')
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 const testFileName = 'no-gzip-accepted.testfile'
 const testFile = path.join(__dirname, '../', testFileName)
 
@@ -14,7 +14,7 @@ const rndData = crypto.randomBytes(1024 * 128).toString('hex') // significantly 
 
 test('does not gzip the response', (t) => {
   t.on('end', () => {
-    rimraf(testFile, () => {})
+    fs.rm(testFile, { force: true }, () => {})
   })
 
   fs.writeFile(testFile, rndData, (err) => {

@@ -1,11 +1,12 @@
+import { test } from './support/tap-shim.js'
+
 // turn off ALL caching.
 global.options = {
   cache: false
 }
 
 // otherwise just the same as basic.
-const { mount } = require('./basic.js')
-const { test } = require('tap')
+const { mount } = await import('./basic-test.js')
 
 // additional tests to ensure that it's actually not caching.
 

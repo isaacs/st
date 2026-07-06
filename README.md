@@ -1,8 +1,13 @@
 # st
 
-[![Travis Status](https://api.travis-ci.org/isaacs/st.svg?branch=master)](https://travis-ci.org/isaacs/st)
+[![CI](https://github.com/isaacs/st/actions/workflows/test.yml/badge.svg)](https://github.com/isaacs/st/actions/workflows/test.yml)
+[![NPM](https://nodei.co/npm/st.svg?style=flat&data=n,v&color=blue)](https://nodei.co/npm/st/)
 
 A module for serving static files.  Does etags, caching, etc.
+
+## Requirements
+
+Node.js 20 or newer. `st` is an ES module package.
 
 ## USAGE
 
@@ -11,10 +16,10 @@ Here are some very simple usage examples.
 Just serve the files in the cwd at the root of the http server url:
 
 ```javascript
-const st = require('st')
-const http = require('http')
+import { createServer } from 'node:http'
+import st from 'st'
 
-http.createServer(
+createServer(
   st(process.cwd())
 ).listen(1337)
 ```
@@ -24,10 +29,15 @@ Serve the files in static under the /static url.  Otherwise do a
 different thing:
 
 ```javascript
-const path = require('path')
-const mount = st({ path: path.join(__dirname, '/static'), url: '/static' })
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { createServer } from 'node:http'
+import st from 'st'
 
-http.createServer((req, res) => {
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const mount = st({ path: path.join(__dirname, 'static'), url: '/static' })
+
+createServer((req, res) => {
   const stHandled = mount(req, res)
   if (stHandled)
     return
@@ -39,10 +49,15 @@ http.createServer((req, res) => {
 The same sort of thing, but using an express middleware style:
 
 ```javascript
-const path = require('path')
-const mount = st({ path: path.join(__dirname, '/static'), url: '/static' })
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { createServer } from 'node:http'
+import st from 'st'
 
-http.createServer((req, res) => {
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const mount = st({ path: path.join(__dirname, 'static'), url: '/static' })
+
+createServer((req, res) => {
   mount(req, res, () => res.end('this is not a static file'))
 }).listen(1339)
 ```
@@ -52,10 +67,15 @@ Serve the files in static under the / url, but only if not some doing
 other thing:
 
 ```javascript
-const path = require('path')
-const mount = st({ path: path.join(__dirname, '/static'), url: '/' })
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { createServer } from 'node:http'
+import st from 'st'
 
-http.createServer((req, res) => {
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const mount = st({ path: path.join(__dirname, 'static'), url: '/' })
+
+createServer((req, res) => {
   if (shouldDoThing(req)) {
     doTheThing(req, res)
   } else {
@@ -68,10 +88,15 @@ Serve the files in static under the / url, but don't serve a 404 if
 the file isn't found, so that the rest of the app can handle it:
 
 ```javascript
-const path = require('path')
-const mount = st({ path: path.join(__dirname, '/static'), url: '/', passthrough: true})
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { createServer } from 'node:http'
+import st from 'st'
 
-http.createServer((req, res) => {
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const mount = st({ path: path.join(__dirname, 'static'), url: '/', passthrough: true })
+
+createServer((req, res) => {
   mount(req, res, () => res.end('this is not a static file'))
 }).listen(1341)
 ```
@@ -81,7 +106,10 @@ Serve the files with
 enabled, to serve static files to any domain:
 
 ```javascript
-http.createServer(
+import { createServer } from 'node:http'
+import st from 'st'
+
+createServer(
   st({
    path: process.cwd(),
    cors: true
@@ -112,7 +140,9 @@ Here are all the options described with their defaults values and a
 few possible settings you might choose to use:
 
 ```javascript
-const st = require('st')
+import { createServer } from 'node:http'
+import st from 'st'
+
 const mount = st({
   path: 'resources/static/', // resolved against the process cwd
   url: 'static/', // defaults to '/'
@@ -166,7 +196,7 @@ const mount = st({
 })
 
 // with bare node.js
-http.createServer((req, res) => {
+createServer((req, res) => {
   if (mount(req, res)) return // serving a static file
   myCustomLogic(req, res)
 }).listen(PORT)
@@ -283,11 +313,14 @@ not.  Thus, a request like
 `/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd` would leak sensitive
 data from the server.
 
-As of version 0.2.5, any `'/../'` in the request path, urlencoded or
-not, will be replaced with `'/'`.  If your application depends on url
-traversal, then you are encouraged to please refactor so that you do
-not depend on having `..` in url paths, as this tends to expose data
-that you may be surprised to be exposing.
+Versions prior to 3.0.4 performed one traversal check before a later
+percent-decode step. In configurations with `dot: true`, encoded
+separators and dots could reintroduce `../` after that check.
+
+Current releases percent-decode before traversal validation, reject decoded
+`..` path segments, and also validate that the resolved filesystem path stays
+inside the configured root. If your application depends on `..` in URL paths,
+please refactor so that it does not depend on traversal-like URLs.
 
 Consider using the `--localhost` setting if you don't want other
 people on your local network to read the files served by the command

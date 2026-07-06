@@ -9,4 +9,4 @@ global.options = {
 }
 
 // otherwise just the same as basic.
-require('./basic.js')
+await import('./basic-test.js')
