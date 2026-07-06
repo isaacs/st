@@ -1,7 +1,9 @@
 global.dot = true
 
+const path = require('path')
 const { test } = require('tap')
 const { req } = require('./dot-common')
+const st = require('../st.js')
 
 // A percent-encoded separator must not smuggle a `..` past the traversal
 // guard. `..%2f` (and `..%5c`) only decode to `../` after the path has been
@@ -24,4 +26,14 @@ test('encoded-backslash parent traversal is forbidden', (t) => {
     t.equal(res.statusCode, 403)
     t.end()
   })
+})
+
+test('resolved paths cannot leave the root', (t) => {
+  const mount = st({
+    dot: true,
+    path: path.join(__dirname, 'fixtures', '.dotted-dir')
+  })._this
+
+  t.equal(mount.getPath('/../space in filename.txt'), 403)
+  t.end()
 })

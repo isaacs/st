@@ -193,10 +193,7 @@ class Mount {
     // sails past the traversal check below until it is decoded. Decoding first
     // means the check, and `path.normalize` after it, see the real path.
     try {
-      const decoded = decodeURIComponent(p)
-      if (decoded !== p) {
-        p = decoded
-      }
+      p = decodeURIComponent(p)
     } catch (e) {
       // not a valid url-encoded path, so we can't safely serve it
       return false
@@ -205,18 +202,22 @@ class Mount {
     // Convert any backslashes to forward slashes (for consistency)
     p = p.replace(/\\/g, '/')
 
-    if ((/[/\\]\.\.([/\\]|$)/).test(p)) {
+    if ((/(^|\/)\.\.(\/|$)/).test(p)) {
       return 403
     }
 
     u = path.normalize(p).replace(/\\/g, '/')
-    if (u.indexOf(this.url) !== 0) {
+    const prefix = this.url.endsWith('/') ? this.url : this.url + '/'
+    if (this.url !== '/' && u !== this.url && u.indexOf(prefix) !== 0) {
       return false
     }
 
     u = u.substr(this.url.length)
     if (u.charAt(0) !== '/') {
       u = '/' + u
+    }
+    if ((/(^|\/)\.\.(\/|$)/).test(u)) {
+      return 403
     }
 
     return u
@@ -229,7 +230,14 @@ class Mount {
     while (u.length > 0 && u[u.length - 1] === '/') {
       u = u.slice(0, -1)
     }
-    return path.join(this.path, u)
+
+    const p = path.resolve(this.path, '.' + u)
+    const rel = path.relative(this.path, p)
+    if (rel === '..' || rel.indexOf('..' + path.sep) === 0 || path.isAbsolute(rel)) {
+      return 403
+    }
+
+    return p
   }
 
   // get a url from a path
@@ -275,6 +283,11 @@ class Mount {
     }
 
     const p = this.getPath(req.sturl)
+    if (p === 403) {
+      res.statusCode = 403
+      res.end(STATUS_CODES[res.statusCode])
+      return true
+    }
 
     // now we have a path.  check for the fd.
     this.cache.fd.fetch(p).then(

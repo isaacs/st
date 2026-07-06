@@ -10,6 +10,7 @@ let server
 
 const opts = {
   dot: global.dot,
+  url: global.url,
   path: path.join(__dirname, 'fixtures', '.dotted-dir')
 }
 
