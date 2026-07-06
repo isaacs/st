@@ -1,6 +1,6 @@
 # st
 
-[![CI](https://github.com/isaacs/st/actions/workflows/test.yml/badge.svg)](https://github.com/isaacs/st/actions/workflows/test.yml)
+[![CI](https://github.com/isaacs/st/actions/workflows/test-and-release.yml/badge.svg)](https://github.com/isaacs/st/actions/workflows/test-and-release.yml)
 [![NPM](https://nodei.co/npm/st.svg?style=flat&data=n,v&color=blue)](https://nodei.co/npm/st/)
 
 A module for serving static files.  Does etags, caching, etc.
