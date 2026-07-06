@@ -61,6 +61,17 @@ const noCaching = {
   content: none
 }
 
+const noCache = (fetch) => {
+  return {
+    maxSize: 0,
+    fetch,
+    has: () => false,
+    get: () => undefined,
+    set: () => {},
+    dump: () => []
+  }
+}
+
 function st (opt) {
   let p, u
   if (typeof opt === 'string') {
@@ -129,11 +140,11 @@ class Mount {
     // cache basically everything
     const c = this.getCacheOptions(opt)
     this.cache = {
-      fd: new LRUCache(c.fd),
-      stat: new LRUCache(c.stat),
-      index: new LRUCache(c.index),
-      readdir: new LRUCache(c.readdir),
-      content: new LRUCache(c.content)
+      fd: c.fd.noCache ? noCache(c.fd.fetchMethod) : new LRUCache(c.fd),
+      stat: c.stat.noCache ? noCache(c.stat.fetchMethod) : new LRUCache(c.stat),
+      index: c.index.noCache ? noCache(c.index.fetchMethod) : new LRUCache(c.index),
+      readdir: c.readdir.noCache ? noCache(c.readdir.fetchMethod) : new LRUCache(c.readdir),
+      content: c.content.noCache ? noCache(c.content.fetchMethod) : new LRUCache(c.content)
     }
 
     this._cacheControl =
@@ -150,7 +161,7 @@ class Mount {
     let o = opt.cache
     const set = (key) => {
       return o[key] === false
-        ? Object.assign({}, none)
+        ? Object.assign({ noCache: true }, none)
         : Object.assign(Object.assign({}, d[key]), o[key])
     }
 
@@ -172,7 +183,7 @@ class Mount {
       content: set('content')
     }
 
-    c.fd.dispose = (key) => this.fdman.close(key)
+    c.fd.dispose = (fd, key) => this.fdman.close(key, fd)
     c.fd.fetchMethod = (key) => new Promise((resolve, reject) => this.fdman.open(key, (err, fd) => err ? reject(err) : resolve(fd)))
 
     c.stat.fetchMethod = (key) => new Promise((resolve, reject) => this._loadStat(key, (err, fd) => err ? reject(err) : resolve(fd)))
