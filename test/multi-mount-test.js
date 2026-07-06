@@ -14,6 +14,8 @@ const __dirname = path.dirname(__filename)
 
 let middlewareServer
 let server
+const host = '127.0.0.1'
+const agent = new http.Agent({ maxSockets: 50 })
 
 // mount the dirname on the /test url
 const mount1 = st({
@@ -51,15 +53,15 @@ function req (url, headers, cb) {
 
   request({
     encoding: null,
-    url: `http://localhost:${port}${url}`,
+    url: `http://${host}:${port}${url}`,
     headers,
-    agentOptions: { maxSockets: 50 }
+    agent
   }, next)
   request({
     encoding: null,
-    url: `http://localhost:${(port + 1)}${url}`,
+    url: `http://${host}:${(port + 1)}${url}`,
     headers,
-    agentOptions: { maxSockets: 50 }
+    agent
   }, next)
 
   function next (er, res, body) {
@@ -95,7 +97,7 @@ test('setup middleware server', function (t) {
       })
     })
   })
-  middlewareServer.listen(port, 'localhost', function () {
+  middlewareServer.listen(port, host, function () {
     t.pass('listening')
     t.end()
   })
@@ -108,7 +110,7 @@ test('setup regular server', function (t) {
       return res.end(`Not a match: ${req.url}`)
     }
   })
-  server.listen(port + 1, 'localhost', function () {
+  server.listen(port + 1, host, function () {
     t.pass('listening')
     t.end()
   })

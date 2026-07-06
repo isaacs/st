@@ -9,6 +9,7 @@ export const request = (options, cb) => {
   const url = new URL(options.url)
   const protocol = url.protocol === 'https:' ? https : http
   const req = protocol.request(url, {
+    agent: options.agent,
     method: options.method || 'GET',
     headers: options.headers || {}
   }, (res) => {
