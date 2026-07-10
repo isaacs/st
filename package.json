@@ -33,7 +33,7 @@
     "@semantic-release/npm": "^13.1.5",
     "@semantic-release/release-notes-generator": "^14.1.1",
     "@types/node": "^26.1.0",
-    "conventional-changelog-conventionalcommits": "10.2.0",
+    "conventional-changelog-conventionalcommits": "10.2.1",
     "eslint": "9.39.4",
     "neostandard": "^0.13.0",
     "semantic-release": "^25.0.5",
