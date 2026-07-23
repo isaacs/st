@@ -37,7 +37,7 @@
     "eslint": "9.39.5",
     "neostandard": "^0.13.0",
     "semantic-release": "^25.0.5",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "scripts": {
     "build": "npm run build:types",
