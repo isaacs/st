@@ -1,3 +1,5 @@
+## [4.0.5](https://github.com/isaacs/st/compare/v4.0.4...v4.0.5) (2026-07-23)
+
 ## [4.0.4](https://github.com/isaacs/st/compare/v4.0.3...v4.0.4) (2026-07-20)
 
 ## [4.0.3](https://github.com/isaacs/st/compare/v4.0.2...v4.0.3) (2026-07-10)

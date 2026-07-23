@@ -1,6 +1,6 @@
 {
   "name": "st",
-  "version": "4.0.4",
+  "version": "4.0.5",
   "description": "A module for serving static files.  Does etags, caching, etc.",
   "type": "module",
   "main": "st.js",
