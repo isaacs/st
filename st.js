@@ -264,7 +264,7 @@ class Mount {
     c.stat.fetchMethod = (key) => new Promise((resolve, reject) => this._loadStat(key, (err, fd) => err ? reject(err) : resolve(fd)))
     c.index.fetchMethod = (key) => new Promise((resolve, reject) => this._loadIndex(key, (err, fd) => err ? reject(err) : resolve(fd)))
     c.readdir.fetchMethod = (key) => new Promise((resolve, reject) => this._loadReaddir(key, (err, fd) => err ? reject(err) : resolve(fd)))
-    c.content.fetchMethod = (key) => new Promise((resolve, reject) => this._loadContent(key, (err, fd) => err ? reject(err) : resolve(fd)))
+    c.content.fetchMethod = (key) => new Promise((_resolve, reject) => this._loadContent(key, reject))
 
     return c
   }
