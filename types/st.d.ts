@@ -1,4 +1,4 @@
-export default st;
+import { LRUCache } from 'lru-cache';
 export type CacheEntryOptions = {
     /**
      * Maximum number of entries to keep.
@@ -81,7 +81,7 @@ export type Options = {
      */
     cachedHeader?: boolean;
 };
-export type Request = import("node:http").IncomingMessage & {
+export type Request = import('node:http').IncomingMessage & {
     sturl?: string | number | false;
     negotiator?: {
         preferredEncoding: (encodings: string[]) => string | undefined;
@@ -90,7 +90,7 @@ export type Request = import("node:http").IncomingMessage & {
 export type ServedRequest = Request & {
     sturl: string;
 };
-export type Response = import("node:http").ServerResponse & {
+export type Response = import('node:http').ServerResponse & {
     filter?: NodeJS.ReadWriteStream;
     error?: (statusCode: number, error: unknown) => void;
 };
@@ -98,59 +98,68 @@ export type ServeFunction = (req: Request, res: Response, next?: () => void) => 
 export type Handler = ServeFunction & {
     _this: Mount;
 };
-export class Mount {
-    /**
-     * @param {Options} opt
-     */
-    constructor(opt: Options);
+/**
+ * Create a static file serving handler.
+ *
+ * @param {string | Options} opt Path to serve, or full options object.
+ * @param {string | Options} [url] Mount URL, or options when the first parameter is a path.
+ * @param {Options} [options] Options when the first two parameters are path and URL.
+ * @returns {Handler}
+ */
+declare function st(opt: string | Options, url?: string | Options, options?: Options): Handler;
+declare class Mount {
     opt: Options;
     url: string;
     path: string;
     _index: string | boolean;
     fdman: any;
     cache: {
-        fd: {
+        fd: LRUCache<{}, {}, unknown> | {
             maxSize: number;
             fetch: any;
             has: () => boolean;
             get: () => any;
             set: () => void;
             dump: () => any[];
-        } | LRUCache<{}, {}, unknown>;
-        stat: {
+        };
+        stat: LRUCache<{}, {}, unknown> | {
             maxSize: number;
             fetch: any;
             has: () => boolean;
             get: () => any;
             set: () => void;
             dump: () => any[];
-        } | LRUCache<{}, {}, unknown>;
-        index: {
+        };
+        index: LRUCache<{}, {}, unknown> | {
             maxSize: number;
             fetch: any;
             has: () => boolean;
             get: () => any;
             set: () => void;
             dump: () => any[];
-        } | LRUCache<{}, {}, unknown>;
-        readdir: {
+        };
+        readdir: LRUCache<{}, {}, unknown> | {
             maxSize: number;
             fetch: any;
             has: () => boolean;
             get: () => any;
             set: () => void;
             dump: () => any[];
-        } | LRUCache<{}, {}, unknown>;
-        content: {
+        };
+        content: LRUCache<{}, {}, unknown> | {
             maxSize: number;
             fetch: any;
             has: () => boolean;
             get: () => any;
             set: () => void;
             dump: () => any[];
-        } | LRUCache<{}, {}, unknown>;
+        };
     };
     _cacheControl: any;
+    /**
+     * @param {Options} opt
+     */
+    constructor(opt: Options);
     /**
      * @param {Options} opt
      */
@@ -164,7 +173,7 @@ export class Mount {
     /**
      * @param {string} u
      */
-    getUriPath(u: string): string | false | 403;
+    getUriPath(u: string): string | 403 | false;
     /**
      * @param {string} u
      */
@@ -189,7 +198,7 @@ export class Mount {
      * @param {ServedRequest} req
      * @param {Response} res
      */
-    index(p: string, req: ServedRequest, res: Response): boolean | void;
+    index(p: string, req: ServedRequest, res: Response): void | boolean;
     /**
      * @param {string} p
      * @param {ServedRequest} req
@@ -205,7 +214,7 @@ export class Mount {
      * @param {Response} res
      * @param {() => void} end
      */
-    file(p: string, fd: number, stat: import("node:fs").Stats, etag: string, req: Request, res: Response, end: () => void): void;
+    file(p: string, fd: number, stat: import('node:fs').Stats, etag: string, req: Request, res: Response, end: () => void): void;
     /**
      * @param {string} p
      * @param {import('node:fs').Stats} stat
@@ -213,7 +222,7 @@ export class Mount {
      * @param {Request} req
      * @param {Response} res
      */
-    cachedFile(p: string, stat: import("node:fs").Stats, etag: string, req: Request, res: Response): void;
+    cachedFile(p: string, stat: import('node:fs').Stats, etag: string, req: Request, res: Response): void;
     /**
      * @param {string} p
      * @param {number} fd
@@ -223,7 +232,7 @@ export class Mount {
      * @param {Response} res
      * @param {() => void} end
      */
-    streamFile(p: string, fd: number, stat: import("node:fs").Stats, etag: string, req: Request, res: Response, end: () => void): void;
+    streamFile(p: string, fd: number, stat: import('node:fs').Stats, etag: string, req: Request, res: Response, end: () => void): void;
     /**
      * @param {string} p
      * @param {(error: NodeJS.ErrnoException | null, data?: Buffer) => void} cb
@@ -233,26 +242,18 @@ export class Mount {
      * @param {string} p
      * @param {(error: NodeJS.ErrnoException | null, data?: Record<string, import('node:fs').Stats>) => void} cb
      */
-    _loadReaddir(p: string, cb: (error: NodeJS.ErrnoException | null, data?: Record<string, import("node:fs").Stats>) => void): void;
+    _loadReaddir(p: string, cb: (error: NodeJS.ErrnoException | null, data?: Record<string, import('node:fs').Stats>) => void): void;
     /**
      * @param {string} key
      * @param {(error: NodeJS.ErrnoException | null, data?: import('node:fs').Stats) => void} cb
      */
-    _loadStat(key: string, cb: (error: NodeJS.ErrnoException | null, data?: import("node:fs").Stats) => void): void;
+    _loadStat(key: string, cb: (error: NodeJS.ErrnoException | null, data?: import('node:fs').Stats) => void): void;
     /**
      * @param {string} _
      * @param {(error: Error) => void} cb
      */
     _loadContent(_: string, cb: (error: Error) => void): void;
 }
-/**
- * Create a static file serving handler.
- *
- * @param {string | Options} opt Path to serve, or full options object.
- * @param {string | Options} [url] Mount URL, or options when the first parameter is a path.
- * @param {Options} [options] Options when the first two parameters are path and URL.
- * @returns {Handler}
- */
-declare function st(opt: string | Options, url?: string | Options, options?: Options): Handler;
-import { LRUCache } from 'lru-cache';
+export { Mount };
+export default st;
 //# sourceMappingURL=st.d.ts.map
