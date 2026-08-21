@@ -1,3 +1,10 @@
+## [4.0.9](https://github.com/isaacs/st/compare/v4.0.8...v4.0.9) (2026-08-21)
+
+### Trivial Changes
+
+* **deps:** downgrade conventional-changelog-conventionalcommits to working version ([035522b](https://github.com/isaacs/st/commit/035522ba47a23c24cf872bfc55614ca5aa45515f))
+* **docs:** backfill missing changelog ([e2dec1d](https://github.com/isaacs/st/commit/e2dec1df31cbe1aa04d19739c07dd8d08c7952f1))
+
 > **Note:** The `v4.0.5` through `v4.0.8` tags were created, but these versions were not published to npm and have no GitHub Release. Their release workflows failed during npm publishing.
 
 ## [4.0.8](https://github.com/isaacs/st/compare/v4.0.7...v4.0.8) (2026-08-03)
