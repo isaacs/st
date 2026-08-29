@@ -1,3 +1,9 @@
+## [4.0.10](https://github.com/isaacs/st/compare/v4.0.9...v4.0.10) (2026-08-29)
+
+### Trivial Changes
+
+* **ci:** check-latest for lts ([c629af4](https://github.com/isaacs/st/commit/c629af4a59d7138cbea8f4050a610a3b54c2950e))
+
 ## [4.0.9](https://github.com/isaacs/st/compare/v4.0.8...v4.0.9) (2026-08-21)
 
 ### Trivial Changes
