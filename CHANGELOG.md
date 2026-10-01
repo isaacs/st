@@ -1,3 +1,9 @@
+## [4.0.11](https://github.com/isaacs/st/compare/v4.0.10...v4.0.11) (2026-10-01)
+
+### Trivial Changes
+
+* **deps-dev:** bump @semantic-release/github ([#121](https://github.com/isaacs/st/issues/121)) ([3f948b9](https://github.com/isaacs/st/commit/3f948b912570b47ead9c8c6bb1ee52441813102c))
+
 ## [4.0.10](https://github.com/isaacs/st/compare/v4.0.9...v4.0.10) (2026-08-29)
 
 ### Trivial Changes
