@@ -1,3 +1,9 @@
+## [4.0.12](https://github.com/isaacs/st/compare/v4.0.11...v4.0.12) (2026-10-19)
+
+### Trivial Changes
+
+* **deps:** bump actions/setup-node ([#123](https://github.com/isaacs/st/issues/123)) ([007abb0](https://github.com/isaacs/st/commit/007abb0eee95907a819656d75f3281af7e79682f))
+
 ## [4.0.11](https://github.com/isaacs/st/compare/v4.0.10...v4.0.11) (2026-10-01)
 
 ### Trivial Changes
