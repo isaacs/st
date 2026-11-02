@@ -1,3 +1,9 @@
+## [4.0.13](https://github.com/isaacs/st/compare/v4.0.12...v4.0.13) (2026-11-02)
+
+### Trivial Changes
+
+* **deps-dev:** bump neostandard ([#124](https://github.com/isaacs/st/issues/124)) ([a9a3840](https://github.com/isaacs/st/commit/a9a3840d4318a04f90961ddc3808a4276b949346))
+
 ## [4.0.12](https://github.com/isaacs/st/compare/v4.0.11...v4.0.12) (2026-10-19)
 
 ### Trivial Changes
