@@ -1,3 +1,9 @@
+## [4.0.14](https://github.com/isaacs/st/compare/v4.0.13...v4.0.14) (2026-11-23)
+
+### Bug Fixes
+
+* keep the mount prefix and url encoding in the autoindex redirect ([#119](https://github.com/isaacs/st/issues/119)) ([b914c7b](https://github.com/isaacs/st/commit/b914c7bb842c0ff7658db588fd8758acfd24bc0b))
+
 ## [4.0.13](https://github.com/isaacs/st/compare/v4.0.12...v4.0.13) (2026-11-02)
 
 ### Trivial Changes
