@@ -518,9 +518,11 @@ class Mount {
    */
   autoindex (p, req, res) {
     if (!/\/$/.exec(req.sturl)) {
+      const url = this.getUrl(p) || req.sturl
+      const loc = url.split('/').map(s => encodeURIComponent(s)).join('/') + '/'
       res.statusCode = 301
-      res.setHeader('location', req.sturl + '/')
-      res.end('Moved: ' + req.sturl + '/')
+      res.setHeader('location', loc)
+      res.end('Moved: ' + loc)
       return
     }
 
